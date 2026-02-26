@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "strata_core",
+  "version": "${version}",
+  "name": "Strata Core",
+  "description": "Shared foundation for the Strata mod ecosystem.",
+  "authors": ["Strata Team"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/strata_core/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.strata.core.StrataCore"],
+    "client": ["io.strata.core.StrataCoreClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "fabric-api": "*",
+    "minecraft": "~1.21",
+    "java": ">=21"
+  }
+}
