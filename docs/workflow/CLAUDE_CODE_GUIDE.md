@@ -13,6 +13,28 @@ Claude Code is an AI coding agent that runs in your terminal or VS Code. For Str
 
 ---
 
+## Design Session Protocol (Cowork ↔ Claude Code)
+
+Cowork (this environment) is where design and documentation happen. Claude Code is where implementation happens. Keep them separate.
+
+**The rule: discuss in Cowork first, write artifacts only after approval.**
+
+```
+1. DISCUSS    — Talk through the idea in Cowork. Tradeoffs, options, implications.
+2. DECIDE     — Land on a clear decision. Jeff confirms: "yes, do it."
+3. WRITE      — Cowork updates the relevant doc(s). Claude Code is never given
+                 ambiguous or mid-debate documentation.
+```
+
+This matters because:
+- Updating a spec mid-discussion, then changing course, creates doc drift and wasted edits.
+- Claude Code reads the docs as ground truth. Docs should only be written when the decision is settled.
+- It keeps the chat history clean — decisions are visible and reversible before they're committed.
+
+**The exception:** Additive changes that don't touch existing content (e.g., a new section in a doc that is entirely self-contained) can be written immediately after the idea is proposed, since there's nothing to un-do if the idea changes.
+
+---
+
 ## Model Selection
 
 Claude Code supports multiple Claude models. For Strata, the right model depends on what you're doing. **Always set the model at the start of a session** — don't switch mid-session.
@@ -368,6 +390,48 @@ The most effective way to work with Claude Code on Strata:
    Bring bugs back to Claude Code with specific descriptions.
    Update the spec if the design changed during implementation.
 ```
+
+---
+
+## Committing Changes
+
+Strata uses [Conventional Commits](https://www.conventionalcommits.org/) for a clean, searchable git history.
+
+### Format
+
+```
+<type>(<scope>): <short description>
+
+# Examples:
+feat(strata-world): add VerdantHighlands biome
+fix(strata-core): fix asset registry NPE
+docs(workflow): add commit workflow guidance
+refactor(strata-core): extract BiomeUtils
+test(strata-world): add biome registration tests
+```
+
+**Types:** `feat` · `fix` · `docs` · `refactor` · `test` · `chore`
+**Scopes:** match the module name (`strata-core`, `strata-world`, etc.) or use `workflow` / `docs` for documentation-only changes.
+
+### When to Commit
+
+- **After a successful `./gradlew build`** — never commit broken code. If the build fails, fix it first.
+- **After a Reviewer session** — commit with a note that review passed.
+- **After Cowork doc updates** — documentation changes get their own commit, separate from code changes.
+- **One logical unit per commit** — scaffold, single feature, single fix. Not one giant commit per session.
+
+### Who Writes the Message
+
+At the end of a Claude Code session, ask it to propose the commit message:
+
+```
+The build is passing and this work is ready to commit. Propose a conventional commit
+message for everything changed in this session.
+```
+
+Review the proposed message, edit if needed, then ask it to run `git commit`.
+
+> **Cowork applies this too.** Doc changes made here (in Cowork) should be committed before starting a Claude Code session that will read those docs. Don't send Claude Code to read a spec that hasn't been committed yet — it should always be working from a clean, committed state.
 
 ---
 
