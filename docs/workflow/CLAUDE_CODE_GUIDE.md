@@ -387,6 +387,39 @@ claude --model claude-sonnet-4-6
 
 ---
 
+### Before Merging to Main
+
+After the quality gate is clean (Scribe committed, branch pushed), do one final validation before merging the feature branch to `main`:
+
+```bash
+# 1. Build the production jars
+./gradlew build
+
+# 2. Copy the built jars to your Minecraft mods folder
+cp strata-core/build/libs/strata-core-*.jar  ~/Library/Application\ Support/minecraft/mods/
+cp strata-world/build/libs/strata-world-*.jar ~/Library/Application\ Support/minecraft/mods/
+# (include any other strata-* modules)
+
+# 3. Launch Minecraft normally (not via runClient)
+#    — Create a new singleplayer world
+#    — Walk around and confirm the module's features work
+#    — Watch the log (logs/latest.log) for errors on world load
+```
+
+**Why this matters:** `runClient` loads resources through Fabric's dev classpath, which is more forgiving than the production resource pipeline. Format errors in biome JSON (`carvers` array format, placed feature names), structure NBT, and data-pack files can pass `runClient` silently and only surface in a real install. A production jar test is the only reliable gate.
+
+**Minimum check per module:**
+
+| Module | What to verify |
+|---|---|
+| `strata-world` | New biome appears in-game; no registry errors on world load |
+| `strata-core` | No startup crash; config file generated at first launch |
+| `strata-rpg` | XP/skill UI visible; no null pointer on first player join |
+
+If this step reveals bugs, open a `fix/<short-description>` branch, fix, re-run the gate cycle, and repeat the jar test before merging.
+
+---
+
 ## Using Subagents (Parallel Work)
 
 Claude Code can spawn parallel subagents to tackle multiple tasks simultaneously. This is powerful for Strata because different parts of a module are often independent.
@@ -504,6 +537,11 @@ The most effective way to work with Claude Code on Strata:
 4. TEST
    Run ./gradlew runClient. Test in-game.
    Log any bugs or unexpected behavior.
+
+   > **runClient is not a substitute for jar validation.** The dev environment loads
+   > resources differently than a standard Minecraft install and can mask format errors
+   > in biome JSON, structure templates, and data-pack files. See "Before Merging to Main"
+   > below for the required jar validation step.
 
 5. ITERATE
    Bring bugs back to Claude Code with specific descriptions.
