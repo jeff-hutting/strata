@@ -220,6 +220,14 @@ If no issues are found, write a brief "Passed" summary instead.
 Do NOT modify any code — report only. I will decide what to fix.
 ```
 
+When the review file is written, commit it:
+```bash
+git add docs/reviews/strata-<module>-<phase>-review.md
+git commit  # use /commit for format reference
+git push
+```
+Stage the review file only — do not stage implementation code.
+
 #### The Reviewer — strata-world Phase 1 (Module-Specific)
 ```
 Read docs/ARCHITECTURE.md and docs/mods/strata-world/SPEC.md.
@@ -251,6 +259,14 @@ If no issues are found, write a brief "Passed" summary instead.
 Do NOT modify any code — report only.
 ```
 
+When the review file is written, commit it:
+```bash
+git add docs/reviews/strata-world-phase1-review.md
+git commit  # use /commit for format reference
+git push
+```
+Stage the review file only — do not stage implementation code.
+
 #### The Fix Session
 ```
 Read docs/ARCHITECTURE.md, docs/mods/strata-<module>/SPEC.md, and
@@ -265,6 +281,14 @@ docs/reviews/strata-<module>-<phase>-fixes.md using this structure:
 
   ### [file path]
   **Changed:** what was done and why
+```
+
+When `./gradlew :strata-<module>:build` passes and the fixes file is written, commit everything:
+```bash
+git add <all changed implementation files>
+git add docs/reviews/strata-<module>-<phase>-fixes.md
+git commit  # use /commit for format reference
+git push
 ```
 
 #### The Tester
@@ -287,6 +311,14 @@ Write a test report to docs/reviews/strata-<module>-<phase>-test-report.md:
   **Result:** passed / failed / skipped (with reason)
 ```
 
+When the test run is clean and the report is written, commit:
+```bash
+git add src/test/
+git add docs/reviews/strata-<module>-<phase>-test-report.md
+git commit  # use /commit for format reference
+git push
+```
+
 #### The Scribe
 ```
 Read docs/ARCHITECTURE.md, docs/mods/strata-<module>/SPEC.md, and
@@ -301,6 +333,14 @@ what was actually built (implementation may have deviated from the spec):
 Do NOT change any Java implementation code.
 Output is the updated files — no separate report needed.
 ```
+
+When all documentation is updated, commit:
+```bash
+git add docs/
+git commit  # use /commit for format reference
+git push
+```
+Stage documentation files only — do not stage implementation code.
 
 ---
 
@@ -501,14 +541,13 @@ test(strata-world): add biome registration tests
 
 ### Who Writes the Message
 
-At the end of a Claude Code session, ask it to propose the commit message:
+Each role prompt now includes a commit step at the end — commit happens within the session, not after. Use the `/commit` slash command for the message format:
 
 ```
-The build is passing and this work is ready to commit. Propose a conventional commit
-message for everything changed in this session.
+/commit
 ```
 
-Review the proposed message, edit if needed, then ask it to run `git commit`.
+Claude Code will review staged changes, propose a conventional commit message using Strata's scopes and types, run `git commit`, and push.
 
 > **Cowork applies this too.** Doc changes made here (in Cowork) should be committed before starting a Claude Code session that will read those docs. Don't send Claude Code to read a spec that hasn't been committed yet — it should always be working from a clean, committed state.
 
@@ -565,6 +604,8 @@ The confirmation step is important — it surfaces any gaps in understanding bef
 | `docs/reviews/<module>-<phase>-fixes.md` | Fix session output |
 | `docs/reviews/<module>-<phase>-test-report.md` | Tester output |
 | `docs/conventions/` | Detailed coding conventions (naming, patterns, etc.) |
+| `.claude/commands/commit.md` | `/commit` slash command — conventional commit format for Strata |
+| `.claude/settings.json` | Committed project permissions — pre-approves common dev commands |
 
 ---
 

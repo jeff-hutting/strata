@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew *)",
+      "Bash(git *)",
+      "Bash(find *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(touch *)",
+      "Bash(java *)",
+      "Bash(python3 *)",
+      "Bash(curl *)",
+      "Bash(grep *)",
+      "Bash(echo *)",
+      "Bash(for *)",
+      "WebFetch(domain:fabricmc.net)",
+      "WebFetch(domain:meta.fabricmc.net)",
+      "WebFetch(domain:maven.fabricmc.net)",
+      "WebFetch(domain:api.modrinth.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebSearch"
+    ]
+  }
+}
