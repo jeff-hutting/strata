@@ -392,10 +392,14 @@ claude --model claude-sonnet-4-6
 After the quality gate is clean (Scribe committed, branch pushed), do one final validation before merging the feature branch to `main`:
 
 ```bash
-# 1. Build the production jars
-./gradlew build
+# 1. Build the production jars — always rebuild from the current branch tip.
+#    Jars in build/libs/ from a previous session are stale and will not reflect
+#    any fixes committed since they were built.
+./gradlew clean build
 
 # 2. Copy the built jars to your Minecraft mods folder
+#    Remove any older strata-* jars first — Minecraft will error if both old
+#    and new versions are present in the mods folder simultaneously.
 cp strata-core/build/libs/strata-core-*.jar  ~/Library/Application\ Support/minecraft/mods/
 cp strata-world/build/libs/strata-world-*.jar ~/Library/Application\ Support/minecraft/mods/
 # (include any other strata-* modules)
