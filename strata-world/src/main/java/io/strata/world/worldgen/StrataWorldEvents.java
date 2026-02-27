@@ -31,6 +31,14 @@ public final class StrataWorldEvents {
         StrataWorldgen.addOverworldBiomes(parameters);
     }
 
+    /**
+     * Called during mod initialization to register any Fabric event listeners.
+     *
+     * <p>In Phase 1 this is a logging-only stub; biome injection is driven by
+     * {@link io.strata.world.mixin.VanillaBiomeParametersMixin} at world-generation
+     * time rather than by a Fabric event callback. Phase 2 will add
+     * {@code BiomeModifications} and asset-registry listeners here.
+     */
     public static void initialize() {
         StrataLogger.debug("StrataWorldEvents initialized.");
     }

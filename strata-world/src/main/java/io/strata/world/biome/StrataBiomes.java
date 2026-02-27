@@ -5,6 +5,18 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.biome.Biome;
 
+/**
+ * Registry keys for all Strata biomes.
+ *
+ * <p>Each constant is a {@link net.minecraft.registry.RegistryKey} under the
+ * {@code strata_world} namespace. Biome properties (features, spawns, colors,
+ * sounds) are defined in JSON files under
+ * {@code data/strata_world/worldgen/biome/}. Multi-noise placement parameters
+ * are defined in {@link io.strata.world.worldgen.StrataWorldgen}.
+ *
+ * <p>Call {@link #initialize()} during mod init to trigger class loading and
+ * ensure all keys are registered before worldgen begins.
+ */
 public final class StrataBiomes {
 
     /** Registry key for the Verdant Highlands biome — rolling mid-elevation hills with dense deciduous forest. */

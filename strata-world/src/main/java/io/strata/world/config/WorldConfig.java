@@ -4,6 +4,17 @@ import me.shedaniel.autoconfig.ConfigData;
 import me.shedaniel.autoconfig.annotation.Config;
 import me.shedaniel.cloth.clothconfig.shadowed.blue.endless.jankson.Comment;
 
+/**
+ * Configuration for the {@code strata-world} module.
+ *
+ * <p>Loaded via Cloth Config's AutoConfig system and written to
+ * {@code config/strata_world.json}. All world-generation tuning values live
+ * here; nothing is hardcoded in the worldgen classes.
+ *
+ * <p>The six {@code verdantHighlands*} fields are point values in the overworld's
+ * six-dimensional multi-noise space. Adjust them to shift where the Verdant
+ * Highlands biome appears on the noise map without recompiling.
+ */
 @Config(name = "strata_world")
 public class WorldConfig implements ConfigData {
 

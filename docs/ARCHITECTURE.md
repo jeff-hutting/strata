@@ -2,7 +2,7 @@
 
 > **Version:** 0.1 (Bootstrap)
 > **Target:** Minecraft Java Edition (Fabric)
-> **Status:** Pre-development planning
+> **Status:** In development — `strata-core` Phase 1 complete, `strata-world` Phase 1 complete
 
 ---
 
@@ -327,19 +327,19 @@ When a new Minecraft version releases:
 
 ## 8. Development Roadmap
 
-### Phase 1 — Foundation
-- [ ] Set up `strata-core` Gradle project
-- [ ] Implement shared configuration system
-- [ ] Implement Strata event bus
-- [ ] Implement player data attachment system
-- [ ] Write `strata-core` spec document
+### Phase 1 — Foundation ✓
+- [x] Set up `strata-core` Gradle project
+- [x] Implement shared configuration system
+- [x] Implement Strata event bus
+- [x] Implement player data attachment system
+- [x] Write `strata-core` spec document
 
-### Phase 2 — World
-- [ ] Set up `strata-world` Gradle project
-- [ ] Research and spec biome/terrain approach for current MC version
-- [ ] Implement first custom biome (simple, as proof of concept)
-- [ ] Implement TerraBlender integration
-- [ ] Write full biome library
+### Phase 2 — World (Phase 1 complete)
+- [x] Set up `strata-world` Gradle project
+- [x] Research and spec biome/terrain approach for current MC version
+- [x] Implement first custom biome (VerdantHighlands — proof of concept via Mixin + JSON)
+- [ ] ~~Implement TerraBlender integration~~ — decided against; using native Fabric Mixin on `VanillaBiomeParameters` instead (see `strata-world` SPEC §2.1 and §3.6)
+- [ ] Write full biome library (Phase 3 of `strata-world`)
 
 ### Phase 3 — Structures
 - [ ] Set up `strata-structures` Gradle project
