@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "strata_world",
+  "version": "${version}",
+  "name": "Strata World",
+  "description": "Custom biomes and world generation for the Strata ecosystem.",
+  "authors": ["Strata Team"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/strata_world/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.strata.world.StrataWorld"]
+  },
+  "mixins": [
+    "strata_world.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "fabric-api": "*",
+    "minecraft": "~1.21",
+    "strata_core": "*",
+    "java": ">=21"
+  }
+}
