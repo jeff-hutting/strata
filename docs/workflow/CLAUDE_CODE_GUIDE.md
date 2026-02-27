@@ -251,9 +251,26 @@ If no issues are found, write a brief "Passed" summary instead.
 Do NOT modify any code — report only.
 ```
 
+#### The Fix Session
+```
+Read docs/ARCHITECTURE.md, docs/mods/strata-<module>/SPEC.md, and
+docs/reviews/strata-<module>-<phase>-review.md.
+
+Fix all issues listed in the review. After fixing, run
+./gradlew :strata-<module>:build and confirm it passes.
+Do not change any code unrelated to the review findings.
+
+When done, write a summary of changes to
+docs/reviews/strata-<module>-<phase>-fixes.md using this structure:
+
+  ### [file path]
+  **Changed:** what was done and why
+```
+
 #### The Tester
 ```
-Read docs/ARCHITECTURE.md and docs/mods/strata-<module>/SPEC.md.
+Read docs/ARCHITECTURE.md, docs/mods/strata-<module>/SPEC.md, and
+docs/reviews/strata-<module>-<phase>-fixes.md.
 
 Write tests for the recently implemented [feature] in strata-<module>/.
 - Use Fabric's GameTest framework for anything that requires a running game world
@@ -263,11 +280,17 @@ Write tests for the recently implemented [feature] in strata-<module>/.
 
 Do NOT modify any implementation code — only add test files under src/test/.
 Run ./gradlew :strata-<module>:test after writing and fix any test compilation errors.
+
+Write a test report to docs/reviews/strata-<module>-<phase>-test-report.md:
+  ### [test class]
+  **Covers:** which acceptance criteria or edge cases
+  **Result:** passed / failed / skipped (with reason)
 ```
 
 #### The Scribe
 ```
-Read docs/ARCHITECTURE.md and docs/mods/strata-<module>/SPEC.md.
+Read docs/ARCHITECTURE.md, docs/mods/strata-<module>/SPEC.md, and
+docs/reviews/strata-<module>-<phase>-fixes.md.
 
 The implementation of [feature] is now complete. Update the following to reflect
 what was actually built (implementation may have deviated from the spec):
@@ -276,30 +299,50 @@ what was actually built (implementation may have deviated from the spec):
 3. Update the roadmap checklist in docs/ARCHITECTURE.md to check off completed items
 
 Do NOT change any Java implementation code.
+Output is the updated files — no separate report needed.
 ```
+
+---
+
+### File Output Convention
+
+**Every agent that produces output another agent will read must write to a file.**
+Terminal output disappears into scroll. Files persist, can be committed, and
+can be passed directly to the next session.
+
+| Session | Output file |
+|---|---|
+| Reviewer | `docs/reviews/<module>-<phase>-review.md` |
+| Fix | `docs/reviews/<module>-<phase>-fixes.md` |
+| Tester | `docs/reviews/<module>-<phase>-test-report.md` |
+| Scribe | Updates spec and ARCHITECTURE.md directly — no separate file |
 
 ---
 
 ### Sequential Quality Gate (Recommended Pattern)
 
-Run three focused sessions after any significant feature implementation:
+Run these focused sessions after any significant feature implementation:
 
 ```bash
-# Session 1: Implement (Sonnet)
+# Session 1: Implement (Sonnet or Opus)
 claude --model claude-sonnet-4-6
 > [developer prompt]
 
-# Session 2: Review (Opus)
+# Session 2: Review (Opus) — writes docs/reviews/<module>-<phase>-review.md
 claude --model claude-opus-4-6
 > [reviewer prompt]
 
-# Session 3: Fix issues found in review (Sonnet)
+# Session 3: Fix (Sonnet) — reads review.md, writes fixes.md
 claude --model claude-sonnet-4-6
-> Fix the issues identified in the review: [paste review output]
+> [fix session prompt]
 
-# Session 4: Test (Sonnet)
+# Session 4: Test (Sonnet) — reads fixes.md, writes test-report.md
 claude --model claude-sonnet-4-6
 > [tester prompt]
+
+# Session 5: Scribe (Sonnet) — reads fixes.md, updates spec + ARCHITECTURE.md
+claude --model claude-sonnet-4-6
+> [scribe prompt]
 ```
 
 ---
@@ -518,7 +561,9 @@ The confirmation step is important — it surfaces any gaps in understanding bef
 | `docs/ARCHITECTURE.md` | Master ecosystem document — read at every session start |
 | `docs/mods/<module>/SPEC.md` | Per-feature specification — read before implementing |
 | `docs/workflow/CLAUDE_CODE_GUIDE.md` | This file |
-| `docs/reviews/<module>-<phase>-review.md` | Reviewer output — one file per module phase |
+| `docs/reviews/<module>-<phase>-review.md` | Reviewer output |
+| `docs/reviews/<module>-<phase>-fixes.md` | Fix session output |
+| `docs/reviews/<module>-<phase>-test-report.md` | Tester output |
 | `docs/conventions/` | Detailed coding conventions (naming, patterns, etc.) |
 
 ---
