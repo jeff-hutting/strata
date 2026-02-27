@@ -22,6 +22,7 @@ Nothing in `strata-world`, `strata-structures`, `strata-rpg`, or `strata-creator
 - **Player Data Attachments** — A framework for modules to persist custom data on players and other entities using Fabric's Data Attachments API
 - **Registry Helpers** — Utility wrappers that simplify block/item/entity registration and enforce Strata naming conventions
 - **Shared Utilities** — Math helpers, NBT utilities, logging wrapper
+- **Asset Registry** — A runtime registry of all custom Strata assets (trees, blocks, mobs, etc.) that acts as the conduit between `strata-creator` (which creates assets) and `strata-world` (which places them in biomes)
 
 ---
 
@@ -350,6 +351,132 @@ public final class StrataaNbtHelper {
 
 ---
 
+### 3.7 Asset Registry
+
+**Package:** `io.strata.core.asset`
+
+This is the conduit between `strata-creator` and `strata-world`. It is a runtime registry — a live, in-memory map of every custom asset that has been designed and registered. Both the Biome Editor (in `strata-world`) and the worldgen engine read from it.
+
+#### Why This Lives in `strata-core`
+
+`strata-creator` must not depend on `strata-world`, and `strata-world` must not depend on `strata-creator`. They are peer modules. The only way they can share data without a direct dependency is through a shared intermediary — `strata-core`. The asset registry is that intermediary.
+
+#### Core Interfaces
+
+```java
+// io.strata.core.asset.WorldgenFeature
+// Implemented by any custom asset that can be placed in a biome as a feature.
+public interface WorldgenFeature {
+    Identifier getId();           // e.g., "strata_creator:my_oak_variant"
+    String getDisplayName();      // Shown in the Biome Editor feature picker
+    FeatureCategory getCategory(); // TREE, PLANT, FLOWER, ROCK, GROUND_COVER, etc.
+    JsonElement toFeatureJson();  // Serialized for inclusion in biome JSON feature arrays
+    boolean isCompatibleWith(BiomeType biomeType); // Biome editor filtering hint
+}
+
+// io.strata.core.asset.SpawnableAsset
+// Implemented by any custom asset that can spawn as a mob in a biome.
+public interface SpawnableAsset {
+    Identifier getId();
+    String getDisplayName();
+    JsonElement toSpawnJson();    // Serialized for biome JSON spawner arrays
+    int getDefaultWeight();
+    int getDefaultMinGroup();
+    int getDefaultMaxGroup();
+}
+```
+
+#### Supporting Enums
+
+```java
+// io.strata.core.asset.FeatureCategory
+public enum FeatureCategory {
+    TREE, SHRUB, PLANT, FLOWER, GRASS,
+    ROCK, CRYSTAL, ORE, GROUND_COVER,
+    WATER_FEATURE, STRUCTURE, CUSTOM
+}
+
+// io.strata.core.asset.BiomeType
+// Used by features to declare compatibility hints for the Biome Editor.
+public enum BiomeType {
+    PLAINS, FOREST, JUNGLE, TAIGA, DESERT,
+    SWAMP, MOUNTAIN, OCEAN, RIVER, CAVE, CUSTOM
+}
+```
+
+#### `StrataAssetRegistry`
+
+```java
+// io.strata.core.asset.StrataAssetRegistry
+public final class StrataAssetRegistry {
+
+    private static final Map<Identifier, WorldgenFeature> FEATURES = new LinkedHashMap<>();
+    private static final Map<Identifier, SpawnableAsset> SPAWNS = new LinkedHashMap<>();
+
+    // Called by strata-creator when a custom asset is finalized.
+    public static void registerFeature(Identifier id, WorldgenFeature feature) {
+        FEATURES.put(id, feature);
+        StrataLogger.debug("Asset registered as worldgen feature: {}", id);
+        StrataEvents.ASSET_REGISTERED.invoker().onAssetRegistered(id, feature);
+    }
+
+    public static void registerSpawn(Identifier id, SpawnableAsset spawn) {
+        SPAWNS.put(id, spawn);
+        StrataLogger.debug("Asset registered as spawnable: {}", id);
+    }
+
+    // Called by strata-world's Biome Editor to populate its feature picker.
+    public static Collection<WorldgenFeature> getAllFeatures() {
+        return Collections.unmodifiableCollection(FEATURES.values());
+    }
+
+    public static Collection<WorldgenFeature> getFeaturesByCategory(FeatureCategory category) {
+        return FEATURES.values().stream()
+            .filter(f -> f.getCategory() == category)
+            .collect(Collectors.toList());
+    }
+
+    public static Optional<WorldgenFeature> getFeature(Identifier id) {
+        return Optional.ofNullable(FEATURES.get(id));
+    }
+
+    public static Collection<SpawnableAsset> getAllSpawns() {
+        return Collections.unmodifiableCollection(SPAWNS.values());
+    }
+}
+```
+
+#### New Event: `ASSET_REGISTERED`
+
+Add to `StrataEvents`:
+
+```java
+// Fired when any custom asset is registered in StrataAssetRegistry.
+// strata-world listens to this to refresh the Biome Editor's asset list.
+public static final Event<AssetRegistered> ASSET_REGISTERED = ...;
+```
+
+Add callback interface `io.strata.core.event.callback.AssetRegistered`:
+
+```java
+@FunctionalInterface
+public interface AssetRegistered {
+    void onAssetRegistered(Identifier id, Object asset);
+}
+```
+
+#### `StrataCore` Initialization Update
+
+Add to `StrataCore.onInitialize()`:
+
+```java
+// Step 6: Initialize asset registry (no-op, but triggers class loading)
+StrataAssetRegistry.initialize();
+StrataLogger.info("Asset registry ready.");
+```
+
+---
+
 ## 4. Public API Summary
 
 What other Strata modules should import and use from `strata-core`:
@@ -360,6 +487,11 @@ What other Strata modules should import and use from `strata-core`:
 | `StrataAttachments` | Reading/writing shared persistent player data |
 | `StrataConfigHelper` | Registering and reading module config classes |
 | `StrataRegistry` | Registering blocks, items, entities |
+| `StrataAssetRegistry` | Registering custom assets; querying them by category or ID |
+| `WorldgenFeature` | Interface implemented by any asset that can appear in a biome |
+| `SpawnableAsset` | Interface implemented by any asset that can spawn as a mob |
+| `FeatureCategory` | Enum for categorizing worldgen features in the editor UI |
+| `BiomeType` | Enum for biome compatibility hints |
 | `StrataLogger` | Logging with consistent Strata prefix |
 | `StrataVersion` | Reading Strata version string |
 
@@ -390,6 +522,12 @@ strata-core/
 │   │   │       ├── PlayerRespawn.java
 │   │   │       ├── PlayerDataLoaded.java
 │   │   │       └── PlayerDataSaving.java
+│   │   ├── asset/
+│   │   │   ├── StrataAssetRegistry.java ← Runtime conduit between creator and world
+│   │   │   ├── WorldgenFeature.java     ← Interface for biome-placeable assets
+│   │   │   ├── SpawnableAsset.java      ← Interface for spawnable mob assets
+│   │   │   ├── FeatureCategory.java     ← Enum: TREE, PLANT, ROCK, etc.
+│   │   │   └── BiomeType.java           ← Enum: FOREST, DESERT, MOUNTAIN, etc.
 │   │   ├── registry/
 │   │   │   └── StrataRegistry.java    ← Registration helper methods
 │   │   └── util/
