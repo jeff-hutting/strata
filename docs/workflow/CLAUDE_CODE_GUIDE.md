@@ -449,6 +449,32 @@ Review the proposed message, edit if needed, then ask it to run `git commit`.
 
 ---
 
+## Starting a New Cowork Session
+
+When this chat gets long or you're starting fresh, open a new Cowork chat and paste this as your first message:
+
+```
+We are continuing development on the Strata Minecraft mod ecosystem.
+
+Please read the following files before we discuss anything:
+- docs/ARCHITECTURE.md
+- docs/workflow/CLAUDE_CODE_GUIDE.md
+
+Then read whichever module specs are relevant to what we're working on:
+- docs/mods/strata-core/SPEC.md
+- docs/mods/strata-world/SPEC.md
+- docs/mods/strata-creator/DESIGN_INTENT.md
+
+Once you've read them, confirm your understanding of the current project state —
+what has been built vs. what is still spec-only.
+```
+
+The confirmation step is important — it surfaces any gaps in understanding before you start giving instructions.
+
+**When to split chats:** At natural stopping points — when a Claude Code session finishes and you're back in Cowork to plan the next phase. Each chat should map roughly to one design phase, with docs committed and up to date before the new chat begins.
+
+---
+
 ## File Reference
 
 | File | Purpose |
