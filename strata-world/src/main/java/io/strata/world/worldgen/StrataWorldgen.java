@@ -45,25 +45,32 @@ public final class StrataWorldgen {
     /**
      * Verdant Highlands: rolling mid-elevation hills with dense deciduous forest.
      * Targets mid-temperature, mid-to-high humidity, inland, low erosion (hilly).
+     * Noise point values are read from WorldConfig so they can be tuned without recompilation.
      */
     private static void addVerdantHighlands(
             Consumer<Pair<MultiNoiseUtil.NoiseHypercube, RegistryKey<Biome>>> parameters,
             float offset) {
 
+        WorldConfig config = StrataConfigHelper.get(WorldConfig.class);
+
         parameters.accept(Pair.of(
                 MultiNoiseUtil.createNoiseHypercube(
-                        0.0f,    // temperature: mild (between cold and warm)
-                        0.3f,    // humidity: moderate-to-lush
-                        0.3f,    // continentalness: inland
-                        -0.4f,   // erosion: low erosion = rolling hills
-                        0.0f,    // depth: surface
-                        0.0f,    // weirdness: normal terrain
-                        offset   // rarity offset
+                        config.verdantHighlandsTemperature,
+                        config.verdantHighlandsHumidity,
+                        config.verdantHighlandsContinentalness,
+                        config.verdantHighlandsErosion,
+                        config.verdantHighlandsDepth,
+                        config.verdantHighlandsWeirdness,
+                        offset
                 ),
                 StrataBiomes.VERDANT_HIGHLANDS
         ));
     }
 
+    /**
+     * Triggers class loading for the worldgen system. Biome injection is performed
+     * by the Mixin at world-generation time.
+     */
     public static void initialize() {
         // Injection happens via Mixin; this triggers class loading.
     }
