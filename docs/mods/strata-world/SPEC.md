@@ -248,7 +248,104 @@ Start conservative — narrow ranges that guarantee the biome appears but doesn'
 
 ---
 
-## 7. File Structure
+## 7. In-Game Biome Editor
+
+The Biome Editor is a Creative-mode-only tool for designing and refining Strata biomes without leaving the game. It is opened via the **Biome Editor Wand** — a special item obtainable from the creative inventory.
+
+This is a planned system, designed now so the module architecture accommodates it. Implementation follows basic biome registration (Phase 2 of `strata-world`).
+
+### 7.1 Two-Layer Real-Time Editing
+
+Biome properties fall into two categories with different update behavior:
+
+**Layer 1 — Visual Properties (instant, no chunk regen)**
+These are client-side rendering properties. Changes are reflected immediately on screen as sliders or color pickers move.
+- Sky color, fog color, water color, water fog color
+- Grass tint, foliage tint
+- Ambient sounds, mood sounds
+- Weather type (rain/snow/none)
+- Particle effects
+
+**Layer 2 — Structural Properties (queued, triggers preview refresh)**
+These affect what generates in the world. Changes queue a 3-second debounced chunk regeneration of a 5×5 chunk preview zone around the player.
+- Multi-noise parameters (temperature, humidity, continentalness, erosion, weirdness)
+- Feature list and density (which trees, plants, rocks appear)
+- Mob spawn entries
+- Surface rules (what blocks form the surface and subsurface layers)
+- Carver configuration
+
+### 7.2 Preview Zone
+
+When the player opens the Biome Editor Wand UI in a Creative world, a **Preview Zone** is established — a 5×5 chunk area centered on the player. A visual overlay (configurable in `WorldConfig`) marks the boundary of the preview zone.
+
+When structural parameters change:
+1. A 3-second debounce timer starts (resets if parameters change again)
+2. On expiry, the preview zone chunks are regenerated using the current biome parameters
+3. The player sees the terrain reshape in real time within the preview area
+4. A HUD indicator shows "Refreshing preview..." during regeneration
+
+The preview zone exists in the normal world — it is not a separate dimension. Server admins should only allow the Biome Editor in creative-mode servers or single-player worlds.
+
+### 7.3 HUD Layout
+
+The Biome Editor UI is a full-screen panel (using Fabric's Screen API) with five tabs:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  STRATA BIOME EDITOR          [New Biome]  [Load]  [Save]  [X]  │
+├──────────┬──────────────────────────────────────────────────────┤
+│ VISUAL   │                                                       │
+│ TERRAIN  │   [Tab content — see below]                          │
+│ FEATURES │                                                       │
+│ SPAWNS   │                                                       │
+│ EXPORT   │                                                       │
+└──────────┴──────────────────────────────────────────────────────┘
+```
+
+**Visual Tab** — Color pickers and sliders for all Layer 1 properties. Live preview updates as values change.
+
+**Terrain Tab** — Six sliders for multi-noise parameters, each with a range display. A "Refresh Preview" button and an auto-refresh toggle (on/off). Shows the current biome name detected at player's feet for reference.
+
+**Features Tab** — Two-column layout: left panel lists features currently in the biome; right panel is a searchable picker of all available features. Available features include vanilla placed features AND everything registered in `StrataAssetRegistry`. Filterable by `FeatureCategory`. Each feature shows its display name, category, and source (vanilla/strata-built-in/custom).
+
+**Spawns Tab** — Similar two-column layout for mob spawn entries. Right panel pulls from both vanilla entity types and `StrataAssetRegistry.getAllSpawns()`. Each entry shows weight, min/max group size (editable inline).
+
+**Export Tab** — Shows a preview of the generated biome JSON. Buttons: "Copy to Clipboard", "Save to File" (writes to `saves/<world>/strata_biomes/<name>.json`), "Apply to World" (registers the biome for the current session).
+
+### 7.4 Asset Registry Integration
+
+The Features tab and Spawns tab query `StrataAssetRegistry` (from `strata-core`) for all available custom assets. This is the conduit — the biome editor does not know or care how the assets were made. It only sees what's in the registry.
+
+When `strata-creator` registers a new custom tree via `StrataAssetRegistry.registerFeature()`, it fires the `ASSET_REGISTERED` event. `strata-world` listens to this event and refreshes the Features tab's available list automatically — no restart required.
+
+```java
+// In StrataWorldEvents (strata-world):
+StrataEvents.ASSET_REGISTERED.register((id, asset) -> {
+    if (asset instanceof WorldgenFeature feature) {
+        BiomeEditorScreen.notifyFeatureListUpdated();
+        StrataLogger.debug("Biome editor: new feature available — {}", id);
+    }
+});
+```
+
+### 7.5 Biome JSON Export Format
+
+The export produces a standard vanilla-compatible biome JSON. Custom asset features are referenced by their `Identifier` in the features array — the worldgen engine knows how to resolve them via `StrataAssetRegistry.getFeature(id)`.
+
+Custom assets in the features array are wrapped in a Strata-specific placed feature type:
+```json
+{
+  "type": "strata_world:custom_asset_feature",
+  "asset_id": "strata_creator:my_oak_variant",
+  "placement": { ... }
+}
+```
+
+This is the only non-vanilla JSON field. Everything else in the exported biome JSON is standard vanilla format.
+
+---
+
+## 8. File Structure
 
 ```
 strata-world/
@@ -260,9 +357,22 @@ strata-world/
 │   │   │   └── StrataBiomes.java         ← BiomeKey registry
 │   │   ├── config/
 │   │   │   └── WorldConfig.java          ← World generation config
+│   │   ├── editor/                       ← Biome Editor (Phase 2)
+│   │   │   ├── BiomeEditorItem.java      ← The Biome Editor Wand item
+│   │   │   ├── BiomeEditorScreen.java    ← Full-screen HUD (Fabric Screen API)
+│   │   │   ├── BiomeEditorState.java     ← Holds current editing session state
+│   │   │   ├── PreviewZoneManager.java   ← Manages 5x5 chunk preview regen
+│   │   │   └── tabs/                    ← One class per HUD tab
+│   │   │       ├── VisualTab.java
+│   │   │       ├── TerrainTab.java
+│   │   │       ├── FeaturesTab.java
+│   │   │       ├── SpawnsTab.java
+│   │   │       └── ExportTab.java
 │   │   └── worldgen/
 │   │       ├── StrataWorldgen.java       ← Multi-noise placement params
-│   │       └── StrataWorldEvents.java    ← Fabric API biome injection
+│   │       ├── StrataWorldEvents.java    ← Fabric API biome injection + asset listener
+│   │       └── feature/
+│   │           └── CustomAssetFeature.java ← Placed feature type for creator assets
 │   └── resources/
 │       ├── fabric.mod.json
 │       └── data/strata_world/
@@ -333,13 +443,35 @@ dependencies {
 
 ---
 
-## 11. Future Phases (Out of Scope for Phase 1)
+## 11. Phase Breakdown
 
-- Custom terrain shaping via noise settings JSON
-- Custom surface rules (block placement on terrain surface)
-- Custom placed features (unique flora, geological formations)
-- Custom mob spawns unique to Strata biomes
-- Additional biomes (CrimsonBadlands, FrostPeaks, etc.)
-- Custom dimension(s)
+### Phase 1 (Current Spec)
+- Basic biome registration pipeline
+- VerdantHighlands proof-of-concept biome
+- WorldConfig (enabled toggle, biomeFrequency)
+
+### Phase 2 — Biome Editor MVP
+- Biome Editor Wand item
+- Full-screen HUD (all five tabs)
+- Visual properties: real-time preview
+- Structural properties: preview zone with debounced chunk regen
+- Feature picker pulling from vanilla + `StrataAssetRegistry`
+- Spawn picker pulling from vanilla + `StrataAssetRegistry`
+- Export biome JSON to file
+- `ASSET_REGISTERED` event listener to refresh editor lists
+
+### Phase 3 — Biome Content Expansion
+- Additional biomes (CrimsonBadlands, FrostPeaks, and more)
+- Custom surface rules per biome
+- Custom placed features unique to Strata biomes
 - Biome-specific ambient sounds and music
+
+### Phase 4 — Advanced Worldgen
+- Custom terrain noise settings
+- Custom dimension(s)
 - Integration with `strata-structures` for biome-aware structure placement
+
+### Out of Scope (All Phases)
+- Any RPG mechanics (belongs in `strata-rpg`)
+- Asset creation (belongs in `strata-creator`)
+- Structure building (belongs in `strata-structures`)
