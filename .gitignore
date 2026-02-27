@@ -20,8 +20,9 @@ bin/
 .DS_Store
 Thumbs.db
 
-# Minecraft run directory
+# Minecraft run directory and logs
 run/
+logs/
 
 # Fabric
 remappedSrc/
