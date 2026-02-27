@@ -113,8 +113,8 @@ class BiomeJsonValidationTest {
 
     @Test
     void hasOakAndBirchTrees() {
-        assertTrue(findInFlatFeatures("minecraft:trees_birch_and_oak"),
-                "features must include minecraft:trees_birch_and_oak (spec: vanilla oak + birch trees)");
+        assertTrue(findInFlatFeatures("minecraft:trees_birch_and_oak_leaf_litter"),
+                "features must include minecraft:trees_birch_and_oak_leaf_litter (renamed in MC 1.21 from trees_birch_and_oak)");
     }
 
     @Test
@@ -140,8 +140,10 @@ class BiomeJsonValidationTest {
     @Test
     void hasCarvers() {
         assertTrue(root.has("carvers"), "biome JSON must define carvers section");
-        assertTrue(root.getAsJsonObject("carvers").has("air"),
-                "carvers must include an 'air' list");
+        assertTrue(root.get("carvers").isJsonArray(),
+                "carvers must be a flat array (MC 1.21+ format — no longer an object with 'air' key)");
+        assertTrue(root.getAsJsonArray("carvers").size() > 0,
+                "carvers array must not be empty");
     }
 
     @Test
