@@ -211,8 +211,44 @@ Review the recently implemented code in strata-<module>/ and check for:
 6. Public API classes have Javadoc on every public method
 7. Acceptance criteria in the spec are fully met
 
-Report every issue found with the file path and line number.
+Write your findings to docs/reviews/strata-<module>-<phase>-review.md using
+this structure for each issue:
+  ### [file path]:[line number]
+  **Issue:** what's wrong
+  **Fix:** what to do
+If no issues are found, write a brief "Passed" summary instead.
 Do NOT modify any code — report only. I will decide what to fix.
+```
+
+#### The Reviewer — strata-world Phase 1 (Module-Specific)
+```
+Read docs/ARCHITECTURE.md and docs/mods/strata-world/SPEC.md.
+
+Review the Phase 1 implementation in strata-world/ and check for:
+
+1. Naming conventions — mod ID strata_world, package io.strata.world,
+   class names per ARCHITECTURE.md Section 5.
+2. Biome pipeline integrity — JSON → StrataBiomes → StrataWorldgen →
+   StrataWorldEvents → overworld. Each step must be traceable.
+3. Noise parameters — temperature, humidity, continentalness, erosion,
+   weirdness, and depth values for VerdantHighlands must live in
+   WorldConfig, not hardcoded in biome or worldgen classes.
+4. Fabric API usage — biome registration must go through Fabric's
+   BiomeModifications API. No direct access to vanilla's BiomeSource
+   or NoiseBasedChunkGenerator internals.
+5. No direct cross-module Java dependencies outside of strata-core.
+6. fabric.mod.json declares strata-core as a dependency with the
+   correct mod ID.
+7. Javadoc on all public methods in StrataBiomes and StrataWorldgen.
+8. All Phase 1 acceptance criteria from the spec are met.
+
+Write your findings to docs/reviews/strata-world-phase1-review.md using
+this structure for each issue:
+  ### [file path]:[line number]
+  **Issue:** what's wrong
+  **Fix:** what to do
+If no issues are found, write a brief "Passed" summary instead.
+Do NOT modify any code — report only.
 ```
 
 #### The Tester
@@ -482,6 +518,7 @@ The confirmation step is important — it surfaces any gaps in understanding bef
 | `docs/ARCHITECTURE.md` | Master ecosystem document — read at every session start |
 | `docs/mods/<module>/SPEC.md` | Per-feature specification — read before implementing |
 | `docs/workflow/CLAUDE_CODE_GUIDE.md` | This file |
+| `docs/reviews/<module>-<phase>-review.md` | Reviewer output — one file per module phase |
 | `docs/conventions/` | Detailed coding conventions (naming, patterns, etc.) |
 
 ---
