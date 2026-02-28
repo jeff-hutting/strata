@@ -32,14 +32,16 @@ public final class StrataWorldEvents {
     }
 
     /**
-     * Called during mod initialization to register any Fabric event listeners.
+     * Called during mod initialization to register Fabric event listeners and
+     * BiomeModifications feature additions.
      *
-     * <p>In Phase 1 this is a logging-only stub; biome injection is driven by
+     * <p>Biome noise-parameter injection is driven by
      * {@link io.strata.world.mixin.VanillaBiomeParametersMixin} at world-generation
-     * time rather than by a Fabric event callback. Phase 2 will add
-     * {@code BiomeModifications} and asset-registry listeners here.
+     * time. Feature registration via {@link StrataWorldFeatures} happens here so
+     * that BiomeModifications callbacks are registered before the first world loads.
      */
     public static void initialize() {
         StrataLogger.debug("StrataWorldEvents initialized.");
+        StrataWorldFeatures.initialize();
     }
 }
