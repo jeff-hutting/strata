@@ -109,30 +109,22 @@ class BiomeJsonValidationTest {
                 effects().getAsJsonObject("mood_sound").get("sound").getAsString());
     }
 
-    // ---- Features (Phase 1 minimal set from SPEC Section 6) ----
+    // ---- Features ----
+    // Vegetation features (trees, flowers, grass) are intentionally absent from the biome JSON.
+    // Inline feature lists in biome JSON force explicit ordering constraints that can cause
+    // "Feature order cycle" crashes when shared features appear in different relative orders
+    // across vanilla biomes. Features are registered instead via Fabric's BiomeModifications
+    // API in StrataWorldgen.java, which inserts into the existing vanilla ordering graph.
+    // Feature coverage is validated by the BiomeModificationsTest suite.
 
     @Test
-    void hasOakAndBirchTrees() {
-        assertTrue(findInFlatFeatures("minecraft:trees_birch_and_oak_leaf_litter"),
-                "features must include minecraft:trees_birch_and_oak_leaf_litter (renamed in MC 1.21 from trees_birch_and_oak)");
-    }
-
-    @Test
-    void hasGrassPatch() {
-        assertTrue(findInFlatFeatures("minecraft:patch_grass_forest"),
-                "features must include minecraft:patch_grass_forest");
-    }
-
-    @Test
-    void hasFlowers() {
-        assertTrue(findInFlatFeatures("minecraft:flower_default"),
-                "features must include minecraft:flower_default (spec: dandelion, poppy, azure bluet)");
-    }
-
-    @Test
-    void hasTallGrass() {
-        assertTrue(findInFlatFeatures("minecraft:patch_tall_grass"),
-                "features must include minecraft:patch_tall_grass");
+    void featuresArrayIsEmpty() {
+        assertTrue(root.has("features"), "biome JSON must define a features array");
+        JsonArray features = root.getAsJsonArray("features");
+        for (int i = 0; i < features.size(); i++) {
+            assertTrue(features.get(i).getAsJsonArray().isEmpty(),
+                    "features step " + i + " must be empty — features are registered via BiomeModifications, not inline JSON");
+        }
     }
 
     // ---- Structural requirements ----
