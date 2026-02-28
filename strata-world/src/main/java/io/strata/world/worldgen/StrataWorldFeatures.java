@@ -13,22 +13,56 @@ import net.minecraft.world.gen.feature.PlacedFeature;
 import java.util.function.Predicate;
 
 /**
- * Registers vanilla placed features for Strata biomes via Fabric's BiomeModifications API.
+ * Registers vanilla placed features for Strata biomes via Fabric's
+ * {@link BiomeModifications} API.
  *
- * <p>Features are added here rather than inline in biome JSON because inline feature
- * lists impose ordering constraints that cause "Feature order cycle" crashes when
- * shared vanilla features appear in different relative orders across biomes.
- * BiomeModifications inserts into the existing vanilla ordering graph and avoids
- * that problem entirely.
+ * <h2>Why BiomeModifications instead of inline biome JSON?</h2>
  *
- * <p>Called from {@link StrataWorldEvents#initialize()} during mod init.
+ * <p>Minecraft's worldgen engine builds a topological ordering graph over all placed
+ * features referenced by biomes. Every time a feature appears in a biome's
+ * {@code features} array, the engine records an ordering constraint: features within
+ * the same decoration step must generate in the order they were declared. When two
+ * biomes declare the <em>same</em> shared vanilla feature (e.g.
+ * {@code minecraft:patch_grass_forest}) at different positions within a step, the
+ * constraints form a cycle, which causes an immediate
+ * {@code "Feature order cycle"} crash on world load.
+ *
+ * <p>{@link BiomeModifications} sidesteps this entirely.
+ * Instead of declaring features inline in the biome JSON (which adds new ordering
+ * constraints), it appends features to the <em>end</em> of vanilla's existing
+ * ordering graph for that step, inheriting the ordering that vanilla already
+ * established. Strata biomes share the same vanilla features as forest, plains, and
+ * similar biomes — so the safe approach is to let vanilla own the ordering and
+ * append via the API.
+ *
+ * <p>As a consequence, all Strata biome JSON files declare empty feature arrays
+ * ({@code [[], [], [], ...]}) and this class is the single authoritative source of
+ * feature registrations.
+ *
+ * <p>Called from {@link StrataWorldEvents#initialize()} during mod init, before any
+ * world is loaded.
+ *
+ * @see net.fabricmc.fabric.api.biome.v1.BiomeModifications
+ * @see net.fabricmc.fabric.api.biome.v1.BiomeSelectors
  */
 public final class StrataWorldFeatures {
 
     private StrataWorldFeatures() {}
 
     /**
-     * Registers all BiomeModifications feature additions for Strata biomes.
+     * Registers all BiomeModifications feature additions for every Strata biome.
+     *
+     * <p>Must be called during mod initialization (from
+     * {@link StrataWorldEvents#initialize()}) so that Fabric processes the
+     * modifications before the first world-generation pass. Adding features after
+     * world load has no effect.
+     *
+     * <p>Currently registers features for:
+     * <ul>
+     *   <li>{@code strata_world:verdant_highlands} — full standard overworld feature
+     *       suite (vegetation, ores, decoration, fluid springs, lava lakes,
+     *       monster rooms, freeze layer)</li>
+     * </ul>
      */
     public static void initialize() {
         registerVerdantHighlandsFeatures();

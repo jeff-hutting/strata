@@ -26,12 +26,14 @@ The trade-off is more complex biome placement code. This complexity is worth it.
 
 ### 2.2 JSON-First Biome Definitions
 
-Every Strata biome is defined primarily as a JSON file under `data/strata_world/worldgen/biome/`. The Java code handles registration and noise placement — the actual biome properties (features, spawns, colors, sounds) live in data files.
+Every Strata biome is defined primarily as a JSON file under `data/strata_world/worldgen/biome/`. The Java code handles registration, noise placement, and feature injection — the actual biome properties (spawns, colors, sounds, carvers) live in data files.
 
 This means:
 - Biome properties can be changed without recompilation
 - Biome JSON files follow vanilla's exact format (no custom parser)
 - Biome content updates survive MC version bumps more easily than code-based biomes
+
+**Features are the exception.** Inline feature lists in biome JSON impose topological ordering constraints on Minecraft's worldgen graph. When a Strata biome shares vanilla placed features with existing biomes, declaring them inline at different positions produces a `"Feature order cycle"` crash on world load. Features are therefore registered via `BiomeModifications.addFeature()` in `StrataWorldFeatures`, which appends to vanilla's existing ordering graph rather than adding new constraints. Strata biome JSON files keep their `features` arrays empty.
 
 ### 2.3 Additive, Not Replacing
 
@@ -48,13 +50,15 @@ Biome density and placement are configurable via `WorldConfig` so server admins 
 The full pipeline for a Strata biome, from data to world:
 
 ```
-data/strata_world/worldgen/biome/<name>.json     ← Biome properties (features, spawns, colors)
+data/strata_world/worldgen/biome/<name>.json     ← Biome properties (spawns, colors, carvers)
          ↓
 StrataBiomes.java                                ← Registers the BiomeKey in the registry
          ↓
 StrataWorldgen.java                              ← Defines multi-noise placement parameters
          ↓
 StrataWorldEvents.java                           ← Injects biome into overworld via Fabric API
+         ↓                                          + calls StrataWorldFeatures.initialize()
+StrataWorldFeatures.java                         ← Registers placed features via BiomeModifications
          ↓
 In-game overworld                                ← Players encounter the biome
 ```
@@ -149,9 +153,9 @@ public final class StrataWorldgen {
 
 ### 3.5 Worldgen Events (`StrataWorldEvents`)
 
-`StrataWorldEvents` is the single orchestration point for biome injection, matching the pipeline in Section 3.1.
+`StrataWorldEvents` is the single orchestration point for worldgen initialization, matching the pipeline in Section 3.1.
 
-In Phase 1, Fabric's `BiomeModifications` API cannot inject *new* biomes into the overworld's multi-noise list — it only supports modifying existing biomes. The actual injection entry point is `onOverworldBiomeParameters()`, called by the Mixin (see Section 3.6):
+Fabric's `BiomeModifications` API cannot inject *new* biomes into the overworld's multi-noise list — it only supports modifying existing biomes. The actual biome injection entry point is `onOverworldBiomeParameters()`, called by the Mixin (see Section 3.6). Feature registration via `BiomeModifications` is handled separately in `StrataWorldFeatures` (see Section 3.7) and is triggered from `initialize()`:
 
 ```java
 // io.strata.world.worldgen.StrataWorldEvents
@@ -166,14 +170,28 @@ public final class StrataWorldEvents {
         StrataWorldgen.addOverworldBiomes(parameters);
     }
 
-    /** Phase 1 stub — Phase 2 will register BiomeModifications and asset listeners here. */
+    /**
+     * Registers Fabric event listeners and BiomeModifications feature additions.
+     * Called during mod initialization; must run before any world is loaded.
+     */
     public static void initialize() {
         StrataLogger.debug("StrataWorldEvents initialized.");
+        StrataWorldFeatures.initialize();
     }
 }
 ```
 
-Phase 2 will add `BiomeModifications` listeners and the `ASSET_REGISTERED` event hook described in Section 7.4.
+Phase 2 will add the `ASSET_REGISTERED` event hook described in Section 7.4.
+
+### 3.7 Feature Registration (`StrataWorldFeatures`)
+
+`StrataWorldFeatures` registers vanilla placed features for Strata biomes using `BiomeModifications.addFeature()`. It is the single source of truth for which features each Strata biome contains.
+
+**Why a separate class?** Biome noise-parameter injection (Mixin-driven) and feature registration (BiomeModifications-driven) are distinct concerns with different timing and API constraints. Keeping them separate makes each easier to extend and reason about.
+
+**Why `BiomeModifications` and not inline JSON?** See Section 2.2. Short answer: inline feature lists cause "Feature order cycle" crashes; `BiomeModifications` does not.
+
+For each biome, `registerVerdantHighlandsFeatures()` (and future per-biome methods) call the private `addFeature()` helper, which constructs the `RegistryKey<PlacedFeature>` and delegates to `BiomeModifications.addFeature()`. All feature IDs are vanilla `minecraft:` namespace identifiers; no Strata-specific placed features exist yet.
 
 ### 3.6 Mixin — Overworld Biome Injection (`VanillaBiomeParametersMixin`)
 
@@ -429,7 +447,8 @@ strata-world/
 │   │   │   └── VanillaBiomeParametersMixin.java  ← Injects biomes at TAIL of writeOverworldBiomeParameters
 │   │   └── worldgen/
 │   │       ├── StrataWorldgen.java       ← Multi-noise placement params + biome injection logic
-│   │       ├── StrataWorldEvents.java    ← Orchestration point; Phase 2 adds BiomeModifications + asset listener
+│   │       ├── StrataWorldEvents.java    ← Orchestration point; calls StrataWorldFeatures + future asset listeners
+│   │       ├── StrataWorldFeatures.java  ← BiomeModifications feature registration for all Strata biomes
 │   │       └── feature/
 │   │           └── CustomAssetFeature.java ← Placed feature type for creator assets (Phase 2)
 │   └── resources/
@@ -512,6 +531,7 @@ dependencies {
 - [x] VerdantHighlands proof-of-concept biome (JSON + multi-noise placement)
 - [x] WorldConfig (enabled toggle, biomeFrequency, per-biome noise-point overrides)
 - [x] JUnit 5 test suite — 39 passed, 1 skipped pending GameTest infrastructure
+- [x] VerdantHighlands feature registration via BiomeModifications (vegetation, ores, decoration, springs, lava lakes, monster rooms, freeze layer)
 
 ### Phase 2 — Biome Editor MVP
 - Biome Editor Wand item

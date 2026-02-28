@@ -338,7 +338,8 @@ When a new Minecraft version releases:
 - [x] Set up `strata-world` Gradle project
 - [x] Research and spec biome/terrain approach for current MC version
 - [x] Implement first custom biome (VerdantHighlands — proof of concept via Mixin + JSON)
-- [ ] ~~Implement TerraBlender integration~~ — decided against; using native Fabric Mixin on `VanillaBiomeParameters` instead (see `strata-world` SPEC §2.1 and §3.6)
+- [x] ~~Implement TerraBlender integration~~ — decided against; using native Fabric Mixin on `VanillaBiomeParameters` instead (see `strata-world` SPEC §2.1 and §3.6)
+- [x] Register VerdantHighlands features via `BiomeModifications` — avoids "Feature order cycle" crash from inline JSON; see `strata-world` SPEC §2.2 and §3.7
 - [ ] Write full biome library (Phase 3 of `strata-world`)
 
 ### Phase 3 — Structures
