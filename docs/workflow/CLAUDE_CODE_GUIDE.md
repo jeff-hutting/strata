@@ -385,6 +385,23 @@ can be passed directly to the next session.
 
 ---
 
+### When to Run the Full Gate vs. a Lighter Process
+
+Not every change needs all five roles. Use judgment:
+
+| Change type | Roles needed |
+|---|---|
+| New phase implementation from spec | Reviewer → Fix → Tester → Scribe |
+| New architectural pattern (first of its kind) | Reviewer → Fix → Tester → Scribe |
+| Bug fix on a `fix/*` branch | Build must pass; Scribe if the fix changes how something works |
+| Feature migration (same behaviour, different mechanism) | Build must pass; Scribe to document the new pattern |
+| Doc-only change | None — just commit |
+| Content addition following an established pattern (e.g. 2nd biome after 1st is solid) | Tester + Scribe; skip Reviewer if pattern is well-established |
+
+**The Scribe is almost always worth running** — doc drift compounds quickly. When in doubt, run it.
+
+**The human test checklist is always required** before merging to main, regardless of which other roles ran.
+
 ### Sequential Quality Gate (Recommended Pattern)
 
 Run these focused sessions after any significant feature implementation:
