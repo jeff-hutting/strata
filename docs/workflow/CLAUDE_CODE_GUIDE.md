@@ -309,12 +309,37 @@ Write a test report to docs/reviews/strata-<module>-<phase>-test-report.md:
   ### [test class]
   **Covers:** which acceptance criteria or edge cases
   **Result:** passed / failed / skipped (with reason)
+
+Also write a human test checklist to docs/reviews/strata-<module>-<phase>-human-test-checklist.md.
+This covers anything that requires in-game verification or has a subjective outcome that automated
+tests cannot assess. Use GitHub-flavored markdown checkboxes. Structure it as:
+
+  # <Module> <Phase> — Human Test Checklist
+  _Check off each item in-game before closing the phase. Commit this file when complete._
+
+  ## Biome / Feature Registration
+  - [ ] [specific thing visible in F3 or tab-complete]
+
+  ## Terrain / Generation
+  - [ ] [subjective terrain shape, transition quality, etc.]
+
+  ## Visuals / Atmosphere
+  - [ ] [colors, fog, sky — things only a human can judge]
+
+  ## Spawning
+  - [ ] [correct mobs present, no wrong mobs, counts feel right]
+
+  ## Notes
+  _Space for unexpected findings._
+
+Only include sections relevant to the module. Omit sections that don't apply.
 ```
 
-When the test run is clean and the report is written, commit:
+When the test run is clean and both files are written, commit:
 ```bash
 git add src/test/
 git add docs/reviews/strata-<module>-<phase>-test-report.md
+git add docs/reviews/strata-<module>-<phase>-human-test-checklist.md
 git commit  # use /commit for format reference
 git push
 ```
@@ -355,6 +380,7 @@ can be passed directly to the next session.
 | Reviewer | `docs/reviews/<module>-<phase>-review.md` |
 | Fix | `docs/reviews/<module>-<phase>-fixes.md` |
 | Tester | `docs/reviews/<module>-<phase>-test-report.md` |
+| Tester | `docs/reviews/<module>-<phase>-human-test-checklist.md` |
 | Scribe | Updates spec and ARCHITECTURE.md directly — no separate file |
 
 ---
@@ -421,6 +447,16 @@ cp strata-world/build/libs/strata-world-*.jar ~/Library/Application\ Support/min
 | `strata-rpg` | XP/skill UI visible; no null pointer on first player join |
 
 If this step reveals bugs, open a `fix/<short-description>` branch, fix, re-run the gate cycle, and repeat the jar test before merging.
+
+**Also work through the human test checklist** (`docs/reviews/<module>-<phase>-human-test-checklist.md`) during this step — check off each item, add notes for anything unexpected, and commit the completed checklist before merging.
+
+### Tools for In-Game Validation (strata-world)
+
+**BetterF3** — Replaces the vanilla F3 overlay with a readable version that shows the current biome name (e.g. `strata_world:verdant_highlands`) clearly. Confirmed working with Strata mods.
+
+**Single-biome world** — The most reliable way to confirm a new biome generates without crashing and to evaluate its visuals in isolation. In the world creation screen, set world type to "Single Biome" and select your custom biome. If the world loads, the biome is valid.
+
+**`/locate biome <biome-id>`** — Vanilla command. Use tab-complete to confirm the biome is registered (`strata_world:verdant_highlands` should appear). If it finds coordinates, teleport there with `/tp <x> ~ <z>`. May not find rare biomes near spawn — try from multiple locations or use the single-biome technique instead.
 
 ---
 
@@ -644,7 +680,8 @@ The confirmation step is important — it surfaces any gaps in understanding bef
 | `docs/workflow/CLAUDE_CODE_GUIDE.md` | This file |
 | `docs/reviews/<module>-<phase>-review.md` | Reviewer output |
 | `docs/reviews/<module>-<phase>-fixes.md` | Fix session output |
-| `docs/reviews/<module>-<phase>-test-report.md` | Tester output |
+| `docs/reviews/<module>-<phase>-test-report.md` | Tester output — automated test results |
+| `docs/reviews/<module>-<phase>-human-test-checklist.md` | Tester output — in-game / subjective checks for Jeff to complete |
 | `docs/conventions/` | Detailed coding conventions (naming, patterns, etc.) |
 | `.claude/commands/commit.md` | `/commit` slash command — conventional commit format for Strata |
 | `.claude/settings.json` | Committed project permissions — pre-approves common dev commands |
