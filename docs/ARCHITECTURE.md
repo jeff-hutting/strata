@@ -366,4 +366,108 @@ When a new Minecraft version releases:
 
 ---
 
+---
+
+## 9. Strata Wand — Universal Editor Entry Point
+
+The **Strata Wand** is the single in-game item through which all Strata creative editors are accessed. It is the unifying UX surface of the Strata creative suite: one item, context-aware, launching the right editor for whatever the player interacts with.
+
+### Design Intent
+
+Rather than one wand per editor (a Biome Wand, a Mob Wand, a Structure Wand…), there is one Strata Wand. Right-clicking any in-game object invokes context detection — the wand queries all registered editor handlers and opens the appropriate editor, or presents a disambiguation prompt if multiple editors apply.
+
+This gives players a single mental model: *"point the wand at what I want to edit."*
+
+### Handler Registry
+
+Each Strata module registers its wand handlers with `strata-core`'s `StrataWandRegistry` during mod initialisation:
+
+```java
+// Example: strata-world registers the biome editor handler
+StrataWandRegistry.register(new BiomeEditorWandHandler());
+
+// Example: strata-creator registers feature and mob editor handlers
+StrataWandRegistry.register(new FeatureEditorWandHandler());
+StrataWandRegistry.register(new MobEditorWandHandler());
+```
+
+On right-click, the wand:
+1. Detects what the player is pointing at (block, entity, structure block, open air)
+2. Queries all registered handlers for matches
+3. If one handler matches — opens that editor directly
+4. If multiple handlers match — presents a disambiguation prompt ("Open Feature Editor or Biome Editor?")
+5. If no handlers match — shows a brief message ("No Strata editor available for this object")
+
+### Editor–Module Mapping
+
+| Interaction | Editor | Module |
+|---|---|---|
+| Right-click terrain / open air | Biome Editor | `strata-world` |
+| Right-click tree / flora / ore | Feature/Asset Editor | `strata-creator` |
+| Right-click mob or entity | Mob Editor | `strata-creator` |
+| Right-click structure block | Structure Editor | `strata-structures` |
+
+### Wand Item Location
+
+The Strata Wand item lives in `strata-world` for Phase 2 (the only implemented module at that point) and migrates to `strata-core` once a second module registers a handler. This migration is mechanical — a class move with updated references — and should be done proactively rather than left until multiple modules are competing for ownership.
+
+### Biome Sampling
+
+When the player right-clicks terrain with the wand (Phase 2), it samples the biome at the player's current position and loads all extractable properties (colors, sounds, noise parameters, features, spawns) into the active editor as a working template. This works for both Strata biomes and vanilla biomes — all relevant properties are accessible via the biome registry entry.
+
+---
+
+## 10. Strata-Pack Format
+
+A **Strata-Pack** (`.stratapack`) is Strata's universal self-contained content distribution format. It is a single archive file that can be created from any Strata editor and imported into any Strata-compatible world or server.
+
+### Purpose
+
+Strata-Pack is the unit of sharing for Strata content. A player designs biomes, flora, mobs, or structures using Strata's creative tools, exports a Strata-Pack, and shares it. The recipient drops it into their installation and imports it — no manual file placement or datapack editing required.
+
+### Format
+
+A Strata-Pack is a ZIP-compatible archive containing:
+
+```
+my-pack.stratapack
+├── strata-pack.json          ← Manifest and metadata
+├── thumbnail.png             ← Optional 512×512 preview image
+└── content/
+    ├── biomes/               ← Biome JSON files
+    ├── features/             ← Custom placed feature definitions (future)
+    ├── entities/             ← Custom mob/entity definitions (future)
+    ├── structures/           ← Custom structure templates (future)
+    └── lang/
+        └── en_us.json        ← Display name translations
+```
+
+### Manifest (`strata-pack.json`)
+
+```json
+{
+  "name": "Highland Collection",
+  "author": "Jeff",
+  "description": "Rolling green highlands with rich forest cover.",
+  "version": "1.0.0",
+  "thumbnail": "thumbnail.png",
+  "strata_version": "0.1.0",
+  "contents": {
+    "biomes": ["verdant_highlands"]
+  }
+}
+```
+
+**Required fields:** `name`, `author`, `version`. All other fields are optional. The schema is an open extension point — new content type keys can be added to `contents` as new modules are built, without breaking existing pack readers.
+
+### Extensibility Principle
+
+The Strata-Pack format is designed to grow with the ecosystem. Phase 2 packs contain only biomes. As `strata-creator`, `strata-structures`, and `strata-rpg` are built, their assets are added as new content type keys in `contents`. Pack readers ignore unknown keys, so older tools remain compatible with newer packs.
+
+### Biome Selection Integration (Phase 4)
+
+A Strata-Pack can be imported into the Phase 4 Biome Selection World Preset as a shortcut: loading a pack pre-selects all its biomes at once, rather than requiring manual selection from a list. This is the primary distribution pathway for curated biome collections.
+
+---
+
 *This document is a living reference. Update it whenever the architecture evolves. Claude Code sessions should read this file at the start of every development session.*

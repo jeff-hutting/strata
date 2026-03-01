@@ -325,9 +325,25 @@ Start conservative — narrow ranges that guarantee the biome appears but doesn'
 
 ## 7. In-Game Biome Editor
 
-The Biome Editor is a Creative-mode-only tool for designing and refining Strata biomes without leaving the game. It is opened via the **Biome Editor Wand** — a special item obtainable from the creative inventory.
+The Biome Editor is the primary creative design tool for authoring and refining Strata biomes without leaving the game. It is accessed via the **Strata Wand** — a special item automatically placed in the player's hand when a Biome Design World is created. The Biome Editor is the first of several editors the Strata Wand will eventually launch as the ecosystem grows (see Section 7.8).
 
-This is a planned system, designed now so the module architecture accommodates it. Implementation follows basic biome registration (Phase 2 of `strata-world`).
+### 7.0 Biome Design World
+
+The Biome Editor operates exclusively within a **Biome Design World** — a custom Minecraft world type selectable from the world creation screen alongside Superflat and Amplified. Its label in the UI is `Strata: Biome Designer`.
+
+**Properties:**
+- Singleplayer only — multiplayer join is disabled at the world type level, eliminating all server-related concerns
+- Generates with the standard overworld chunk generator using natural terrain, giving accurate visual feedback for terrain noise parameters (erosion, weirdness, continentalness, etc.)
+- The Strata Wand is automatically placed in the player's main hand at first spawn, accompanied by a splash message: *"Welcome to the Strata Biome Designer. Your wand is ready."*
+- Persists as a normal Minecraft world save — players can maintain multiple Design World saves as independent biome projects
+
+**Typical design workflow:**
+1. Create a new Biome Design World (or open an existing one)
+2. Right-click with the Strata Wand to open the Biome Editor
+3. Adjust parameters; the world updates in real time as changes are applied
+4. Wander or sample nearby biomes for inspiration (see Section 7.8)
+5. When satisfied, export to a biome JSON or Strata-Pack (see Section 7.9)
+6. Deploy the exported file to any world or server
 
 ### 7.1 Two-Layer Real-Time Editing
 
@@ -342,7 +358,7 @@ These are client-side rendering properties. Changes are reflected immediately on
 - Particle effects
 
 **Layer 2 — Structural Properties (queued, triggers preview refresh)**
-These affect what generates in the world. Changes queue a 3-second debounced chunk regeneration of a 5×5 chunk preview zone around the player.
+These affect what generates in the world. Changes trigger a debounced chunk regeneration of the active preview zone (see Section 7.2). Debouncing means the regen timer resets each time a value changes — regeneration only fires once the player has stopped making changes for a full 3-second window. This prevents the world from rebuilding constantly during active slider adjustments.
 - Multi-noise parameters (temperature, humidity, continentalness, erosion, weirdness)
 - Feature list and density (which trees, plants, rocks appear)
 - Mob spawn entries
@@ -351,41 +367,46 @@ These affect what generates in the world. Changes queue a 3-second debounced chu
 
 ### 7.2 Preview Zone
 
-When the player opens the Biome Editor Wand UI in a Creative world, a **Preview Zone** is established — a 5×5 chunk area centered on the player. A visual overlay (configurable in `WorldConfig`) marks the boundary of the preview zone.
+The **Preview Zone** is the area of the Design World where biome parameters are applied and visible. Its radius dynamically matches the player's current **Render Distance** setting (Main Menu → Options → Video Settings) — players with higher render distances see a larger preview area automatically. No separate configuration is required.
 
-When structural parameters change:
-1. A 3-second debounce timer starts (resets if parameters change again)
-2. On expiry, the preview zone chunks are regenerated using the current biome parameters
-3. The player sees the terrain reshape in real time within the preview area
-4. A HUD indicator shows "Refreshing preview..." during regeneration
+When structural parameters change (Layer 2):
+1. A 3-second debounce timer starts; resets if any parameter changes again before expiry
+2. On expiry, all chunks within the current render distance are regenerated using the active biome parameters
+3. A HUD indicator shows "Refreshing preview…" during regeneration
+4. An undo snapshot is captured at this moment (see Section 7.7)
 
-The preview zone exists in the normal world — it is not a separate dimension. Server admins should only allow the Biome Editor in creative-mode servers or single-player worlds.
+**Reset World** — A toolbar button in the editor. Clears all generated region files and regenerates the entire world from scratch using the current parameters. Requires a confirmation prompt. Useful when accumulated structural edits have made the terrain feel inconsistent, or when starting a new biome in an existing Design World.
+
+**Biome Blending toggle** — When enabled, natural vanilla worldgen runs outside the current render distance, allowing neighbouring vanilla biomes to generate. This lets the designer evaluate how their biome blends and transitions at its borders — a critical part of biome design. When disabled, the edited biome dominates the entire world.
 
 ### 7.3 HUD Layout
 
-The Biome Editor UI is a full-screen panel (using Fabric's Screen API) with five tabs:
+The Biome Editor UI is a full-screen panel (using Fabric's Screen API) with five tabs. The header bar shows the biome's editable display name at all times (see Section 7.6):
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  STRATA BIOME EDITOR          [New Biome]  [Load]  [Save]  [X]  │
-├──────────┬──────────────────────────────────────────────────────┤
-│ VISUAL   │                                                       │
-│ TERRAIN  │   [Tab content — see below]                          │
-│ FEATURES │                                                       │
-│ SPAWNS   │                                                       │
-│ EXPORT   │                                                       │
-└──────────┴──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  [ Verdant Highlands ✎ ]   strata_world:verdant_highlands            │
+│                                   [New]  [Load]  [Save]  [Export] [X]│
+├──────────┬───────────────────────────────────────────────────────────┤
+│ VISUAL   │                                                            │
+│ TERRAIN  │   [Tab content — see below]                               │
+│ FEATURES │                                                            │
+│ SPAWNS   │                                                            │
+│ EXPORT   │                                                            │
+└──────────┴───────────────────────────────────────────────────────────┘
 ```
+
+The display name is editable inline at any time (click the pencil icon). The auto-derived biome ID is shown below it in smaller text and can be manually overridden.
 
 **Visual Tab** — Color pickers and sliders for all Layer 1 properties. Live preview updates as values change.
 
-**Terrain Tab** — Six sliders for multi-noise parameters, each with a range display. A "Refresh Preview" button and an auto-refresh toggle (on/off). Shows the current biome name detected at player's feet for reference.
+**Terrain Tab** — Six sliders for multi-noise parameters, each with a range display. A "Refresh Preview" button and an auto-refresh toggle (on/off). Shows the biome name detected at the player's feet for reference.
 
-**Features Tab** — Two-column layout: left panel lists features currently in the biome; right panel is a searchable picker of all available features. Available features include vanilla placed features AND everything registered in `StrataAssetRegistry`. Filterable by `FeatureCategory`. Each feature shows its display name, category, and source (vanilla/strata-built-in/custom).
+**Features Tab** — Two-column layout: left panel lists features currently in the biome; right panel is a searchable picker of all available features. Available features include vanilla placed features AND everything registered in `StrataAssetRegistry`. Filterable by `FeatureCategory`. Each feature shows its display name, category, and source (vanilla / strata-built-in / custom).
 
-**Spawns Tab** — Similar two-column layout for mob spawn entries. Right panel pulls from both vanilla entity types and `StrataAssetRegistry.getAllSpawns()`. Each entry shows weight, min/max group size (editable inline).
+**Spawns Tab** — Same two-column layout for mob spawn entries. Right panel pulls from both vanilla entity types and `StrataAssetRegistry.getAllSpawns()`. Each entry shows weight, min/max group size (editable inline).
 
-**Export Tab** — Shows a preview of the generated biome JSON. Buttons: "Copy to Clipboard", "Save to File" (writes to `saves/<world>/strata_biomes/<name>.json`), "Apply to World" (registers the biome for the current session).
+**Export Tab** — Buttons: "Copy JSON to Clipboard", "Save Biome JSON" (writes to `saves/<world>/strata_biomes/<name>.json`), "Export Strata-Pack" (see Section 7.9). Also contains Strata-Pack metadata fields (name, author, description, version) and a "Create Thumbnail" button that captures the current view as a 512×512 PNG.
 
 ### 7.4 Asset Registry Integration
 
@@ -405,7 +426,7 @@ StrataEvents.ASSET_REGISTERED.register((id, asset) -> {
 
 ### 7.5 Biome JSON Export Format
 
-The export produces a standard vanilla-compatible biome JSON. Custom asset features are referenced by their `Identifier` in the features array — the worldgen engine knows how to resolve them via `StrataAssetRegistry.getFeature(id)`.
+The export produces a standard vanilla-compatible biome JSON. Custom asset features are referenced by their `Identifier` in the features array — the worldgen engine resolves them via `StrataAssetRegistry.getFeature(id)`.
 
 Custom assets in the features array are wrapped in a Strata-specific placed feature type:
 ```json
@@ -417,6 +438,92 @@ Custom assets in the features array are wrapped in a Strata-specific placed feat
 ```
 
 This is the only non-vanilla JSON field. Everything else in the exported biome JSON is standard vanilla format.
+
+### 7.6 Biome Naming
+
+Every biome has two name representations:
+
+**Display Name** — The human-readable name shown in-game. Editable at any time via the header bar pencil icon. Required before first save or export (the editor prompts if missing). Example: `Verdant Highlands`.
+
+**Biome ID** — The namespaced registry identifier, auto-derived from the display name by lowercasing and replacing spaces with underscores: `Verdant Highlands` → `strata_world:verdant_highlands`. Shown below the display name in the header and manually overridable.
+
+**Translation key** — On export, a translation entry is written to `assets/strata_world/lang/en_us.json`:
+```json
+"biome.strata_world.verdant_highlands": "Verdant Highlands"
+```
+This is standard vanilla translation. Any mod that reads Minecraft's biome translation system — JourneyMap, Xaero's Minimap, BetterF3, and others — displays the human-readable name automatically, with no special compatibility code required.
+
+### 7.7 State Persistence & Undo/Redo
+
+**Draft persistence** — `BiomeEditorState` serializes the full editor state (all parameter values, display name, active tab, undo history) to `saves/<world>/strata_biomes/<name>.draft.json` whenever a change is made. The draft is restored automatically when the Design World is reopened and survives game restarts. The editor tracks whether the current state has been exported, and shows an indicator when there are unexported changes.
+
+**Unsaved-change prompts** — Any action that would replace the current draft (Load, New, wand biome sampling, Reset World) checks for unexported changes and shows a confirmation prompt before proceeding.
+
+**Undo/Redo** — The editor maintains a stack of `BiomeEditorState` snapshots:
+- A new snapshot is captured each time a Layer 2 debounce fires (i.e., each chunk regen)
+- Layer 1 changes (visual-only) snapshot on a shorter debounce (~500ms)
+- Undo/Redo: Ctrl+Z / Ctrl+Y, or toolbar buttons
+- Undoing or redoing a Layer 2 state triggers a new chunk regen of the preview zone
+- Stack depth is configurable via a slider in the editor's preferences panel: range 5–100 steps, default 20
+- This approach mirrors Logic Pro's undo depth setting — users tune it to balance history depth against memory overhead on their machine
+
+### 7.8 Strata Wand Interactions
+
+The **Strata Wand** is a universal content inspector and editor launcher — the single in-game entry point to all Strata creative tools. Its capabilities grow as new modules are built, via a handler registry in `strata-core`.
+
+**Phase 2 interactions (Biome Editor only):**
+
+*Right-click in open air* — Opens the Biome Editor screen with the current draft loaded.
+
+*Right-click while pointing at terrain* — Samples the biome at the player's current position. Reads all extractable properties (colors, sounds, noise parameters, features, spawns) from the biome registry and loads them into `BiomeEditorState` as a working template. Shows "Loaded template: `minecraft:badlands`" in the header. Vanilla biomes can be sampled — all editor-relevant properties are accessible from the biome registry entry. An unsaved-change prompt appears if a draft is in progress.
+
+This interaction supports the common creative journey: a player finds a vanilla biome they admire ("I love how the Badlands terrain feels"), samples it as a starting point, then customises from there rather than building from scratch.
+
+**Future interactions (added as modules are built):**
+
+*Right-click on a tree, plant, ore, or other placed feature* — Queries all registered wand handlers. If multiple handlers match (e.g., Feature/Asset Editor from `strata-creator` and Biome Editor), a disambiguation prompt appears: "Open Feature Editor or Biome Editor?" The selected editor opens with the clicked object as the baseline template.
+
+*Right-click on a mob or entity* — Opens the Mob Editor (`strata-creator`) with that entity type as the baseline.
+
+*Right-click on a structure block* — Opens the Structure Editor (`strata-structures`) with that structure as the baseline.
+
+**Handler registry** — Each Strata module registers its wand handlers with `strata-core`'s `StrataWandRegistry` during mod init. On right-click, the wand collects all matching handlers and either opens the editor directly (one match) or presents a disambiguation prompt (multiple matches). The wand item lives in `strata-world` for Phase 2 and migrates to `strata-core` once a second module registers a handler.
+
+### 7.9 Strata-Pack
+
+A **Strata-Pack** (`.stratapack`) is Strata's universal self-contained content distribution format — a single archive file that bundles any combination of Strata assets created across the ecosystem.
+
+**Contents (Phase 2 — biomes only):**
+- One or more biome JSON files
+- Associated `en_us.json` lang entries (display names)
+- A manifest file (`strata-pack.json`) with metadata and a content index
+
+**Contents (future phases — as modules are built):**
+- Custom placed features and flora (`strata-creator`)
+- Custom mob and entity definitions (`strata-creator`)
+- Custom structure templates (`strata-structures`)
+- Custom items and blocks (`strata-creator`)
+- Any future Strata ecosystem asset type
+
+**Manifest (`strata-pack.json`):**
+```json
+{
+  "name": "Highland Collection",
+  "author": "Jeff",
+  "description": "Rolling green highlands with rich forest cover.",
+  "version": "1.0.0",
+  "thumbnail": "thumbnail.png",
+  "strata_version": "0.1.0",
+  "contents": {
+    "biomes": ["verdant_highlands"]
+  }
+}
+```
+Required fields for export: `name`, `author`, `version`. All other fields are optional. The schema is an open extension point — new fields can be added by future Strata versions without breaking existing pack readers.
+
+**Export UI** — The Export tab includes editable fields for all metadata properties and a "Create Thumbnail" button (captures current view as a 512×512 PNG). This metadata pattern and the thumbnail button are consistent across all future Strata editors.
+
+**Use in Biome Selection Screen (Phase 4)** — A Strata-Pack can be imported into the Phase 4 Biome Selection Screen as a shortcut: loading a pack pre-selects all its contained biomes at once, rather than requiring the user to pick them one by one from a list.
 
 ---
 
@@ -534,14 +641,23 @@ dependencies {
 - [x] VerdantHighlands feature registration via BiomeModifications (vegetation, ores, decoration, springs, lava lakes, monster rooms, freeze layer)
 
 ### Phase 2 — Biome Editor MVP
-- Biome Editor Wand item
-- Full-screen HUD (all five tabs)
-- Visual properties: real-time preview
-- Structural properties: preview zone with debounced chunk regen
+- **Biome Design World** custom world preset (`Strata: Biome Designer`) — singleplayer-only, natural terrain, Strata Wand auto-given at first spawn with splash message
+- **Strata Wand** item with two Phase 2 interactions: right-click open editor, right-click terrain to sample biome as template
+- **Wand handler registry stub** in `strata-core` (`StrataWandRegistry`) — biome handler only in Phase 2; extensible for future modules
+- Full-screen HUD (all five tabs) with editable display name and auto-derived biome ID in header
+- Layer 1 (visual) properties: instant real-time preview, no chunk regen
+- Layer 2 (structural) properties: 3-second debounced chunk regen across full render distance
+- **Reset World** button — clears all region files, regens from scratch, confirmation prompt
+- **Biome Blending toggle** — enables vanilla biome generation outside render distance for transition preview
+- **Biome naming**: display name editable at any time; ID auto-derived; translation key written to `en_us.json` for JourneyMap / Xaero's compatibility
+- **Draft persistence**: `BiomeEditorState` serializes to world save on every change; survives game restarts
+- **Undo/Redo**: snapshot on each debounce fire; configurable depth 5–100 steps (default 20) via preferences slider
+- **Load biome from list**: reads existing Strata biome JSON → populates UI → unsaved-change prompt → Reset World regen
 - Feature picker pulling from vanilla + `StrataAssetRegistry`
 - Spawn picker pulling from vanilla + `StrataAssetRegistry`
-- Export biome JSON to file
-- `ASSET_REGISTERED` event listener to refresh editor lists
+- Export biome JSON to file (`saves/<world>/strata_biomes/<name>.json`)
+- **Strata-Pack export** (`.stratapack` archive with manifest, metadata fields, thumbnail capture)
+- `ASSET_REGISTERED` event listener to refresh editor feature/spawn lists live
 
 ### Phase 3 — Biome Content Expansion
 - Additional biomes (CrimsonBadlands, FrostPeaks, and more)
@@ -553,6 +669,7 @@ dependencies {
 - Custom terrain noise settings
 - Custom dimension(s)
 - Integration with `strata-structures` for biome-aware structure placement
+- **Biome Selection World Preset** — A custom world type ("Strata World") selectable at world creation. Features a point-and-click biome selection UI that generates a serialized configuration string (analogous to Superflat's layer string). The string encodes which biomes are active for that world — any mix of Strata custom biomes and vanilla biomes, or Strata-only. Vanilla biomes are included by default unless explicitly excluded. The world generator reads this string to filter the biome pool at world load time.
 
 ### Out of Scope (All Phases)
 - Any RPG mechanics (belongs in `strata-rpg`)
