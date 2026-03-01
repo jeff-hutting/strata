@@ -1,6 +1,8 @@
 package io.strata.world.editor;
 
+import io.strata.core.config.StrataConfigHelper;
 import io.strata.core.util.StrataLogger;
+import io.strata.world.config.WorldConfig;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
@@ -20,12 +22,6 @@ import net.minecraft.util.math.ChunkPos;
  * @see BiomeEditorState.UndoManager
  */
 public class PreviewZoneManager {
-
-    /** Debounce delay for Layer 2 changes, in milliseconds. */
-    private static final long LAYER2_DEBOUNCE_MS = 3000;
-
-    /** Debounce delay for Layer 1 changes (undo snapshots), in milliseconds. */
-    private static final long LAYER1_DEBOUNCE_MS = 500;
 
     private final BiomeEditorState state;
     private final BiomeEditorState.UndoManager undoManager;
@@ -66,13 +62,16 @@ public class PreviewZoneManager {
     /**
      * Called every client tick. Checks whether debounce timers have expired
      * and triggers chunk regeneration or snapshot capture as needed.
+     * Debounce durations are read from {@link WorldConfig} so they can be
+     * tuned without recompilation.
      */
     public void tick() {
         long now = System.currentTimeMillis();
+        WorldConfig config = StrataConfigHelper.get(WorldConfig.class);
 
         // Check Layer 2 debounce — trigger chunk regen
         if (lastLayer2ChangeTime > 0 && !regenerating) {
-            if (now - lastLayer2ChangeTime >= LAYER2_DEBOUNCE_MS) {
+            if (now - lastLayer2ChangeTime >= config.editorLayer2DebounceMs) {
                 lastLayer2ChangeTime = -1;
                 triggerRegeneration();
             }
@@ -80,7 +79,7 @@ public class PreviewZoneManager {
 
         // Check Layer 1 debounce — capture undo snapshot
         if (lastLayer1ChangeTime > 0) {
-            if (now - lastLayer1ChangeTime >= LAYER1_DEBOUNCE_MS) {
+            if (now - lastLayer1ChangeTime >= config.editorLayer1DebounceMs) {
                 lastLayer1ChangeTime = -1;
                 undoManager.captureSnapshot(state);
                 StrataLogger.debug("Captured Layer 1 undo snapshot");

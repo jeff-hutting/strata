@@ -1,9 +1,14 @@
 package io.strata.world.editor;
 
 import io.strata.core.util.StrataLogger;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NbtSizeTracker;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.WorldSavePath;
 import net.minecraft.world.gen.WorldPreset;
 
 /**
@@ -39,6 +44,30 @@ public final class BiomeDesignWorldPreset {
      */
     public static boolean isBiomeDesignWorld(RegistryKey<WorldPreset> presetKey) {
         return BIOME_DESIGNER.equals(presetKey);
+    }
+
+    /**
+     * Returns whether the running server is hosting a Biome Design World.
+     *
+     * <p>Reads the world preset identifier from {@code level.dat}
+     * ({@code Data → WorldGenSettings → preset}) and compares it against
+     * {@link #BIOME_DESIGNER}. Falls back to {@code false} on any I/O error.
+     *
+     * @param server the Minecraft server instance
+     * @return {@code true} if the current world was created with the Biome Designer preset
+     */
+    public static boolean isCurrentWorldBiomeDesignWorld(MinecraftServer server) {
+        try {
+            java.nio.file.Path levelDat = server.getSavePath(WorldSavePath.LEVEL_DAT);
+            NbtCompound root = NbtIo.readCompressed(levelDat, NbtSizeTracker.ofUnlimitedBytes());
+            NbtCompound data = root.getCompoundOrEmpty("Data");
+            NbtCompound wgs = data.getCompoundOrEmpty("WorldGenSettings");
+            String preset = wgs.getString("preset", "");
+            return BIOME_DESIGNER.getValue().toString().equals(preset);
+        } catch (Exception e) {
+            StrataLogger.debug("isCurrentWorldBiomeDesignWorld: could not read level.dat — {}", e.getMessage());
+            return false;
+        }
     }
 
     /**

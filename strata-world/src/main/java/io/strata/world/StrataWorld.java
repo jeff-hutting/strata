@@ -1,6 +1,7 @@
 package io.strata.world;
 
 import io.strata.core.config.StrataConfigHelper;
+import io.strata.core.event.StrataEvents;
 import io.strata.core.util.StrataLogger;
 import io.strata.core.wand.StrataWandRegistry;
 import io.strata.world.biome.StrataBiomes;
@@ -11,6 +12,9 @@ import io.strata.world.editor.StrataWand;
 import io.strata.world.worldgen.StrataWorldEvents;
 import io.strata.world.worldgen.StrataWorldgen;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
 
 /**
  * Entry point for the {@code strata-world} module.
@@ -47,6 +51,31 @@ public class StrataWorld implements ModInitializer {
         BiomeDesignWorldPreset.initialize();
         StrataWand.register();
         StrataWandRegistry.register(new BiomeEditorWandHandler());
+
+        // Issue #1 — Singleplayer enforcement: kick non-host players in a Biome Design World.
+        // Biome Design Worlds are singleplayer-only per SPEC §7.0. Only the first connected
+        // player (the host) is permitted; any additional join attempt is rejected.
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            if (!BiomeDesignWorldPreset.isCurrentWorldBiomeDesignWorld(server)) return;
+            if (server.getCurrentPlayerCount() > 1) {
+                handler.disconnect(
+                        Text.translatable("disconnect.strata_world.biome_design_singleplayer"));
+            }
+        });
+
+        // Issue #2 — Wand auto-give + splash message on first join to a Biome Design World.
+        // Fires exactly once per player (PLAYER_FIRST_JOIN is not re-fired on respawn).
+        StrataEvents.PLAYER_FIRST_JOIN.register(player -> {
+            var server = player.getEntityWorld().getServer();
+            if (BiomeDesignWorldPreset.isCurrentWorldBiomeDesignWorld(server)) {
+                player.getInventory().setStack(
+                        player.getInventory().getSelectedSlot(),
+                        new ItemStack(StrataWand.INSTANCE));
+                player.sendMessage(
+                        Text.translatable("message.strata_world.welcome"),
+                        false);
+            }
+        });
 
         StrataLogger.info("strata-world initialized. {} biomes registered.", StrataBiomes.count());
     }

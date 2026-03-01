@@ -1,5 +1,8 @@
 package io.strata.world.editor;
 
+import io.strata.core.config.StrataConfigHelper;
+import io.strata.core.util.StrataLogger;
+import io.strata.world.config.WorldConfig;
 import io.strata.world.editor.tabs.*;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -9,6 +12,7 @@ import net.minecraft.client.util.InputUtil;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -34,20 +38,21 @@ public class BiomeEditorScreen extends Screen {
     private static final int HEADER_HEIGHT = 40;
 
     private final BiomeEditorState state;
-    private final BiomeEditorState.UndoManager undoManager;
     private final List<EditorTab> tabs;
     private int activeTabIndex = 0;
 
     /**
      * Creates a new BiomeEditorScreen with the given editor state.
      *
-     * @param state       the current editor state
-     * @param undoManager the undo/redo manager
+     * <p>The {@link BiomeEditorState.UndoManager} is owned by the state object
+     * (see {@link BiomeEditorState#getUndoManager()}). The undo depth is
+     * synchronized from {@link WorldConfig#editorUndoDepth} on construction.
+     *
+     * @param state the current editor state (owns the undo/redo manager)
      */
-    public BiomeEditorScreen(BiomeEditorState state, BiomeEditorState.UndoManager undoManager) {
+    public BiomeEditorScreen(BiomeEditorState state) {
         super(Text.translatable("screen.strata_world.biome_editor"));
         this.state = state;
-        this.undoManager = undoManager;
         this.tabs = List.of(
                 new VisualTab(this, state),
                 new TerrainTab(this, state),
@@ -56,6 +61,9 @@ public class BiomeEditorScreen extends Screen {
                 new ExportTab(this, state)
         );
         this.activeTabIndex = state.getActiveTab();
+        // Apply the configured undo depth so the manager reflects current preferences
+        int configDepth = StrataConfigHelper.get(WorldConfig.class).editorUndoDepth;
+        state.getUndoManager().setMaxDepth(configDepth);
     }
 
     @Override
@@ -63,6 +71,7 @@ public class BiomeEditorScreen extends Screen {
         super.init();
         // TODO: Initialize header bar widgets (display name field, biome ID label, buttons)
         // TODO: Initialize tab sidebar buttons
+        // TODO: Add Load button to header bar — triggers loadBiome() with a file picker
         // TODO: Initialize active tab content
         initActiveTab();
     }
@@ -149,14 +158,14 @@ public class BiomeEditorScreen extends Screen {
     }
 
     private void performUndo() {
-        BiomeEditorState previous = undoManager.undo(state);
+        BiomeEditorState previous = state.getUndoManager().undo(state);
         if (previous != null) {
             // TODO: apply previous state to the editor
         }
     }
 
     private void performRedo() {
-        BiomeEditorState next = undoManager.redo(state);
+        BiomeEditorState next = state.getUndoManager().redo(state);
         if (next != null) {
             // TODO: apply next state to the editor
         }
@@ -170,11 +179,34 @@ public class BiomeEditorScreen extends Screen {
     /** Returns the current editor state. */
     public BiomeEditorState getState() { return state; }
 
-    /** Returns the undo manager. */
-    public BiomeEditorState.UndoManager getUndoManager() { return undoManager; }
+    /**
+     * Returns the undo manager for this editor session.
+     * Delegates to {@link BiomeEditorState#getUndoManager()}.
+     */
+    public BiomeEditorState.UndoManager getUndoManager() { return state.getUndoManager(); }
 
     /**
-     * Called by the ASSET_REGISTERED event listener to refresh
+     * Loads a biome from an existing JSON file into the editor state.
+     *
+     * <p>If there are unsaved changes, a confirmation prompt should be shown
+     * before proceeding. Once confirmed, the JSON is parsed into a new
+     * {@link BiomeEditorState}, the editor state is replaced, and a Reset World
+     * regen is triggered to apply the new parameters in the preview zone.
+     *
+     * @param jsonPath the path to the biome JSON file to load
+     * @todo Implement: parse JSON → populate state → unsaved-change prompt → Reset World regen (SPEC §11 Phase 2)
+     */
+    public void loadBiome(Path jsonPath) {
+        // TODO: Implement load biome from list
+        // 1. If state.isDirty() || !state.isExported(), show confirmation prompt
+        // 2. Read and parse the biome JSON at jsonPath into a new BiomeEditorState
+        // 3. Replace the current state's fields with the loaded values
+        // 4. Trigger a Reset World regen to apply the new structural parameters
+        StrataLogger.debug("loadBiome() called for path {} — not yet implemented", jsonPath);
+    }
+
+    /**
+     * Called by the {@code ASSET_REGISTERED} event listener to refresh
      * the feature and spawn lists in the Features and Spawns tabs.
      */
     public static void notifyFeatureListUpdated() {

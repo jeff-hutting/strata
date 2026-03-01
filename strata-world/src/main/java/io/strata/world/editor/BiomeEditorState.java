@@ -9,17 +9,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.List;
 
 /**
  * Holds the full state of the Biome Editor at any point in time.
  *
  * <p>Includes the biome's display name, auto-derived ID, all Layer 1 (visual)
- * and Layer 2 (structural) parameter values, and serialization to/from
- * {@code saves/<world>/strata_biomes/<name>.draft.json}.
+ * and Layer 2 (structural) parameter values, the undo/redo history, and
+ * serialization to/from {@code saves/<world>/strata_biomes/<name>.draft.json}.
  *
- * <p>Undo/redo is managed via an external snapshot stack — see {@link UndoManager}.
+ * <p>The {@link UndoManager} is owned by this state object so that undo history
+ * is included in draft serialization per SPEC §7.7.
  *
  * @see UndoManager
  * @see BiomeEditorScreen
@@ -67,8 +67,11 @@ public class BiomeEditorState {
 
     // --- Metadata ---
 
-    /** Whether the current state has been exported since the last change. */
-    private transient boolean exported = false;
+    /**
+     * Whether the current state has been exported since the last change.
+     * Persisted in drafts so reopening a world correctly shows the export indicator.
+     */
+    private boolean exported = false;
 
     /** Whether any change has been made since the last save. */
     private transient boolean dirty = false;
@@ -76,12 +79,23 @@ public class BiomeEditorState {
     /** The active tab index (0-4). */
     private int activeTab = 0;
 
+    /**
+     * The undo/redo manager for this editor session. Owned here so Gson
+     * serializes the full undo history as part of the draft (SPEC §7.7).
+     *
+     * <p>Null until {@link #getUndoManager()} is first called (lazy-initialized
+     * with depth 20). Snapshots created by {@link #copy()} intentionally leave
+     * this null so nested serialization of the undo stacks stays bounded.
+     */
+    private UndoManager undoManager = null;
+
     // --- Constructors ---
 
     public BiomeEditorState() {}
 
     /**
      * Creates a deep copy of this state for undo snapshots.
+     * Does not copy the {@link UndoManager} — snapshot copies carry no undo history.
      */
     public BiomeEditorState copy() {
         BiomeEditorState copy = new BiomeEditorState();
@@ -108,13 +122,21 @@ public class BiomeEditorState {
             copy.spawnEntries.add(entry.copy());
         }
         copy.activeTab = this.activeTab;
+        // undoManager intentionally not copied — snapshots carry no undo history
         return copy;
     }
 
     // --- Display Name / Biome ID ---
 
+    /** Returns the human-readable display name. */
     public String getDisplayName() { return displayName; }
 
+    /**
+     * Sets the display name. Auto-derives the biome ID unless the ID has been
+     * manually overridden.
+     *
+     * @param displayName the new display name
+     */
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
         if (!biomeIdOverridden) {
@@ -123,8 +145,14 @@ public class BiomeEditorState {
         markDirty();
     }
 
+    /** Returns the namespaced biome ID (auto-derived or manually set). */
     public String getBiomeId() { return biomeId; }
 
+    /**
+     * Manually sets the biome ID, overriding auto-derivation from the display name.
+     *
+     * @param biomeId the namespaced biome ID to use
+     */
     public void setBiomeId(String biomeId) {
         this.biomeId = biomeId;
         this.biomeIdOverridden = true;
@@ -144,63 +172,119 @@ public class BiomeEditorState {
 
     // --- Layer 1 Accessors ---
 
+    /** Returns the sky color as a packed RGB decimal integer. */
     public int getSkyColor() { return skyColor; }
+
+    /** Sets the sky color. Layer 1 — changes apply instantly without chunk regen. */
     public void setSkyColor(int skyColor) { this.skyColor = skyColor; markDirty(); }
 
+    /** Returns the fog color as a packed RGB decimal integer. */
     public int getFogColor() { return fogColor; }
+
+    /** Sets the fog color. Layer 1 — changes apply instantly without chunk regen. */
     public void setFogColor(int fogColor) { this.fogColor = fogColor; markDirty(); }
 
+    /** Returns the water color as a packed RGB decimal integer. */
     public int getWaterColor() { return waterColor; }
+
+    /** Sets the water color. Layer 1 — changes apply instantly without chunk regen. */
     public void setWaterColor(int waterColor) { this.waterColor = waterColor; markDirty(); }
 
+    /** Returns the water fog color as a packed RGB decimal integer. */
     public int getWaterFogColor() { return waterFogColor; }
+
+    /** Sets the water fog color. Layer 1 — changes apply instantly without chunk regen. */
     public void setWaterFogColor(int waterFogColor) { this.waterFogColor = waterFogColor; markDirty(); }
 
+    /** Returns the grass tint color, or {@code -1} to use the biome's default tint. */
     public int getGrassColor() { return grassColor; }
+
+    /** Sets the grass tint color. Layer 1 — changes apply instantly. Use {@code -1} for biome default. */
     public void setGrassColor(int grassColor) { this.grassColor = grassColor; markDirty(); }
 
+    /** Returns the foliage tint color, or {@code -1} to use the biome's default tint. */
     public int getFoliageColor() { return foliageColor; }
+
+    /** Sets the foliage tint color. Layer 1 — changes apply instantly. Use {@code -1} for biome default. */
     public void setFoliageColor(int foliageColor) { this.foliageColor = foliageColor; markDirty(); }
 
+    /** Returns whether this biome has rain precipitation. */
     public boolean hasRain() { return hasRain; }
+
+    /** Sets whether this biome has rain. Layer 1 — changes apply instantly. */
     public void setHasRain(boolean hasRain) { this.hasRain = hasRain; markDirty(); }
 
+    /** Returns whether this biome has snow precipitation. */
     public boolean hasSnow() { return hasSnow; }
+
+    /** Sets whether this biome has snow. Layer 1 — changes apply instantly. */
     public void setHasSnow(boolean hasSnow) { this.hasSnow = hasSnow; markDirty(); }
 
     // --- Layer 2 Accessors ---
 
+    /** Returns the temperature multi-noise parameter. */
     public float getTemperature() { return temperature; }
+
+    /** Sets the temperature. Layer 2 — triggers debounced chunk regen. */
     public void setTemperature(float temperature) { this.temperature = temperature; markDirty(); }
 
+    /** Returns the humidity multi-noise parameter. */
     public float getHumidity() { return humidity; }
+
+    /** Sets the humidity. Layer 2 — triggers debounced chunk regen. */
     public void setHumidity(float humidity) { this.humidity = humidity; markDirty(); }
 
+    /** Returns the continentalness multi-noise parameter. */
     public float getContinentalness() { return continentalness; }
+
+    /** Sets the continentalness. Layer 2 — triggers debounced chunk regen. */
     public void setContinentalness(float continentalness) { this.continentalness = continentalness; markDirty(); }
 
+    /** Returns the erosion multi-noise parameter. */
     public float getErosion() { return erosion; }
+
+    /** Sets the erosion. Layer 2 — triggers debounced chunk regen. */
     public void setErosion(float erosion) { this.erosion = erosion; markDirty(); }
 
+    /** Returns the weirdness multi-noise parameter. */
     public float getWeirdness() { return weirdness; }
+
+    /** Sets the weirdness. Layer 2 — triggers debounced chunk regen. */
     public void setWeirdness(float weirdness) { this.weirdness = weirdness; markDirty(); }
 
+    /** Returns the depth multi-noise parameter. */
     public float getDepth() { return depth; }
+
+    /** Sets the depth. Layer 2 — triggers debounced chunk regen. */
     public void setDepth(float depth) { this.depth = depth; markDirty(); }
 
+    /** Returns the list of placed-feature identifiers active in this biome. */
     public List<String> getFeatures() { return features; }
+
+    /** Sets the active feature list. Layer 2 — triggers debounced chunk regen. */
     public void setFeatures(List<String> features) { this.features = features; markDirty(); }
 
+    /** Returns the list of mob spawn entries active in this biome. */
     public List<SpawnEntry> getSpawnEntries() { return spawnEntries; }
+
+    /** Sets the mob spawn entries. Layer 2 — triggers debounced chunk regen. */
     public void setSpawnEntries(List<SpawnEntry> spawnEntries) { this.spawnEntries = spawnEntries; markDirty(); }
 
     // --- Metadata ---
 
+    /** Returns the currently active tab index (0 = Visual, 1 = Terrain, etc.). */
     public int getActiveTab() { return activeTab; }
+
+    /** Sets the active tab index. Does not mark the state dirty. */
     public void setActiveTab(int activeTab) { this.activeTab = activeTab; }
 
+    /** Returns whether the state has been modified since the last save. */
     public boolean isDirty() { return dirty; }
+
+    /** Returns whether the current state has been exported since the last change. */
     public boolean isExported() { return exported; }
+
+    /** Marks this state as exported. Clears the "unexported changes" indicator. */
     public void markExported() { this.exported = true; }
 
     private void markDirty() {
@@ -208,12 +292,32 @@ public class BiomeEditorState {
         this.exported = false;
     }
 
+    /** Clears the dirty flag after a successful save. */
     public void clearDirty() { this.dirty = false; }
+
+    // --- Undo Manager ---
+
+    /**
+     * Returns the undo/redo manager for this state.
+     *
+     * <p>Lazy-initialized with depth 20 if not yet set. The Biome Editor screen
+     * calls {@link UndoManager#setMaxDepth(int)} after construction to apply
+     * the configured depth from {@link io.strata.world.config.WorldConfig}.
+     *
+     * @return the undo manager (never null)
+     */
+    public UndoManager getUndoManager() {
+        if (undoManager == null) {
+            undoManager = new UndoManager(20);
+        }
+        return undoManager;
+    }
 
     // --- Serialization ---
 
     /**
      * Serializes this state to JSON.
+     * Includes the undo/redo history per SPEC §7.7.
      */
     public String toJson() {
         return GSON.toJson(this);
@@ -307,18 +411,21 @@ public class BiomeEditorState {
      *
      * <p>Captures a snapshot on each Layer 2 debounce fire (chunk regen) and
      * on a shorter debounce (~500ms) for Layer 1 changes. Stack depth is
-     * configurable via the editor's preferences panel (range 5–100, default 20).
+     * configurable via the editor's preferences panel (range 5–100).
+     *
+     * <p>Fields use {@link ArrayDeque} (concrete type) rather than the {@code Deque}
+     * interface so Gson can round-trip the stacks correctly during draft serialization.
      */
     public static class UndoManager {
 
-        private final Deque<BiomeEditorState> undoStack = new ArrayDeque<>();
-        private final Deque<BiomeEditorState> redoStack = new ArrayDeque<>();
+        private ArrayDeque<BiomeEditorState> undoStack = new ArrayDeque<>();
+        private ArrayDeque<BiomeEditorState> redoStack = new ArrayDeque<>();
         private int maxDepth;
 
         /**
          * Creates an UndoManager with the given maximum stack depth.
          *
-         * @param maxDepth the maximum number of undo steps (5–100)
+         * @param maxDepth the maximum number of undo steps (clamped to 5–100)
          */
         public UndoManager(int maxDepth) {
             this.maxDepth = Math.max(5, Math.min(100, maxDepth));
@@ -332,7 +439,7 @@ public class BiomeEditorState {
             undoStack.push(state.copy());
             if (undoStack.size() > maxDepth) {
                 // Remove the oldest entry (bottom of stack)
-                ((ArrayDeque<BiomeEditorState>) undoStack).removeLast();
+                undoStack.removeLast();
             }
             redoStack.clear();
         }
@@ -377,7 +484,7 @@ public class BiomeEditorState {
         public void setMaxDepth(int maxDepth) {
             this.maxDepth = Math.max(5, Math.min(100, maxDepth));
             while (undoStack.size() > this.maxDepth) {
-                ((ArrayDeque<BiomeEditorState>) undoStack).removeLast();
+                undoStack.removeLast();
             }
         }
     }

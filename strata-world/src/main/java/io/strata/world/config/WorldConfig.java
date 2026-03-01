@@ -46,4 +46,17 @@ public class WorldConfig implements ConfigData {
     @Comment("VerdantHighlands: weirdness noise point. 0.0 = normal terrain.")
     public float verdantHighlandsWeirdness = 0.0f;
 
+    // --- Biome Editor preferences ---
+
+    @Comment("Biome Editor: Layer 2 (structural) debounce delay in milliseconds.\n" +
+             "Chunk regen fires after this many ms of no structural-parameter changes. Default: 3000.")
+    public long editorLayer2DebounceMs = 3000L;
+
+    @Comment("Biome Editor: Layer 1 (visual) debounce delay in milliseconds.\n" +
+             "Undo snapshot fires after this many ms of no visual-property changes. Default: 500.")
+    public long editorLayer1DebounceMs = 500L;
+
+    @Comment("Biome Editor: undo stack depth. Range: 5–100. Default: 20.")
+    public int editorUndoDepth = 20;
+
 }

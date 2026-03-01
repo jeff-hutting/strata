@@ -3,6 +3,7 @@ package io.strata.core.event;
 import io.strata.core.event.callback.*;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
+import net.minecraft.util.Identifier;
 
 public final class StrataEvents {
 
@@ -40,6 +41,17 @@ public final class StrataEvents {
             EventFactory.createArrayBacked(PlayerDataSaving.class, listeners -> player -> {
                 for (PlayerDataSaving listener : listeners) {
                     listener.onPlayerDataSaving(player);
+                }
+            });
+
+    /**
+     * Fired when a custom asset is registered in {@code StrataAssetRegistry}.
+     * {@code strata-world} listens to refresh the Biome Editor's feature/spawn lists live.
+     */
+    public static final Event<AssetRegistered> ASSET_REGISTERED =
+            EventFactory.createArrayBacked(AssetRegistered.class, listeners -> (id, asset) -> {
+                for (AssetRegistered listener : listeners) {
+                    listener.onAssetRegistered(id, asset);
                 }
             });
 }

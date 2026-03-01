@@ -1,7 +1,11 @@
 package io.strata.world.worldgen;
 
 import com.mojang.datafixers.util.Pair;
+import io.strata.core.event.StrataEvents;
 import io.strata.core.util.StrataLogger;
+import io.strata.world.editor.BiomeEditorScreen;
+import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.api.EnvType;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.source.util.MultiNoiseUtil;
@@ -39,9 +43,23 @@ public final class StrataWorldEvents {
      * {@link io.strata.world.mixin.VanillaBiomeParametersMixin} at world-generation
      * time. Feature registration via {@link StrataWorldFeatures} happens here so
      * that BiomeModifications callbacks are registered before the first world loads.
+     *
+     * <p>The {@code ASSET_REGISTERED} event listener is registered only on the
+     * client side (guarded by an environment check) because {@link BiomeEditorScreen}
+     * is a client-only class and must not be loaded on a dedicated server.
      */
     public static void initialize() {
         StrataLogger.debug("StrataWorldEvents initialized.");
         StrataWorldFeatures.initialize();
+
+        // Issue #7 — ASSET_REGISTERED listener: refresh Biome Editor feature/spawn lists
+        // when strata-creator registers a new custom asset (SPEC §7.4).
+        // Guarded by EnvType.CLIENT because BiomeEditorScreen is a client-only class.
+        if (FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) {
+            StrataEvents.ASSET_REGISTERED.register((id, asset) -> {
+                BiomeEditorScreen.notifyFeatureListUpdated();
+                StrataLogger.debug("Biome editor: new asset registered — {}", id);
+            });
+        }
     }
 }

@@ -540,7 +540,7 @@ strata-world/
 │   │   ├── config/
 │   │   │   └── WorldConfig.java          ← World generation config
 │   │   ├── editor/                       ← Biome Editor (Phase 2 — not yet implemented)
-│   │   │   ├── BiomeEditorItem.java
+│   │   │   ├── StrataWand.java
 │   │   │   ├── BiomeEditorScreen.java
 │   │   │   ├── BiomeEditorState.java
 │   │   │   ├── PreviewZoneManager.java
