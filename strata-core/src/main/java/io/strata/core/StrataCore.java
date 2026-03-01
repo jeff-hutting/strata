@@ -5,6 +5,7 @@ import io.strata.core.config.StrataConfigHelper;
 import io.strata.core.config.StrataCoreConfig;
 import io.strata.core.event.StrataEvents;
 import io.strata.core.util.StrataLogger;
+import io.strata.core.wand.StrataWandRegistry;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -35,6 +36,9 @@ public class StrataCore implements ModInitializer {
             }
             StrataEvents.PLAYER_DATA_LOADED.invoker().onPlayerDataLoaded(player);
         });
+
+        // Initialize wand handler registry
+        StrataWandRegistry.initialize();
 
         // Fire the initialized event
         StrataEvents.STRATA_INITIALIZED.invoker().onStrataInitialized();

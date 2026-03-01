@@ -2,8 +2,12 @@ package io.strata.world;
 
 import io.strata.core.config.StrataConfigHelper;
 import io.strata.core.util.StrataLogger;
+import io.strata.core.wand.StrataWandRegistry;
 import io.strata.world.biome.StrataBiomes;
 import io.strata.world.config.WorldConfig;
+import io.strata.world.editor.BiomeDesignWorldPreset;
+import io.strata.world.editor.BiomeEditorWandHandler;
+import io.strata.world.editor.StrataWand;
 import io.strata.world.worldgen.StrataWorldEvents;
 import io.strata.world.worldgen.StrataWorldgen;
 import net.fabricmc.api.ModInitializer;
@@ -38,6 +42,11 @@ public class StrataWorld implements ModInitializer {
         StrataBiomes.initialize();
         StrataWorldgen.initialize();
         StrataWorldEvents.initialize();
+
+        // Phase 2: Biome Editor systems
+        BiomeDesignWorldPreset.initialize();
+        StrataWand.register();
+        StrataWandRegistry.register(new BiomeEditorWandHandler());
 
         StrataLogger.info("strata-world initialized. {} biomes registered.", StrataBiomes.count());
     }

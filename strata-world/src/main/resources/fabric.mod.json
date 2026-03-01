@@ -10,7 +10,8 @@
   "icon": "assets/strata_world/icon.png",
   "environment": "*",
   "entrypoints": {
-    "main": ["io.strata.world.StrataWorld"]
+    "main": ["io.strata.world.StrataWorld"],
+    "client": ["io.strata.world.StrataWorldClient"]
   },
   "mixins": [
     "strata_world.mixins.json"
