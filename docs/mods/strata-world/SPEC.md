@@ -525,6 +525,47 @@ Required fields for export: `name`, `author`, `version`. All other fields are op
 
 **Use in Biome Selection Screen (Phase 4)** — A Strata-Pack can be imported into the Phase 4 Biome Selection Screen as a shortcut: loading a pack pre-selects all its contained biomes at once, rather than requiring the user to pick them one by one from a list.
 
+### 7.10 Implementation Notes (Yarn 1.21.11+build.4)
+
+Four Yarn mapping gaps required API workarounds during the Phase 2 fix session. These are documented here for the next MC version migration.
+
+**1. `LevelProperties.getWorldPreset()` not mapped**
+
+The method to query the world preset from `LevelProperties` does not exist in Yarn 1.21.11+build.4. Replaced with a direct `level.dat` NBT read:
+
+```java
+NbtCompound root = NbtIo.readCompressed(levelDat, NbtSizeTracker.ofUnlimitedBytes());
+String preset = root.getCompoundOrEmpty("Data")
+                    .getCompoundOrEmpty("WorldGenSettings")
+                    .getString("preset", "");
+```
+
+This is used in `BiomeDesignWorldPreset.isCurrentWorldBiomeDesignWorld()` to detect whether the current world was created with the Biome Designer preset.
+
+**2. `Entity.getServer()` not mapped**
+
+`Entity.getServer()` is absent from Yarn 1.21.11+build.4 mappings. Replaced with:
+
+```java
+MinecraftServer server = player.getEntityWorld().getServer();
+```
+
+On server-side entities, `getEntityWorld()` returns a `ServerWorld` directly, and `ServerWorld.getServer()` is accessible. Used in `StrataWorld.onInitialize()` to check the world preset on player first join.
+
+**3. `PlayerInventory.selectedSlot` is private**
+
+The `selectedSlot` field is not publicly accessible in Yarn 1.21.11+build.4. Replaced with the public accessor:
+
+```java
+player.getInventory().getSelectedSlot()
+```
+
+Used in `StrataWorld.onInitialize()` to place the Strata Wand in the player's active hotbar slot on first join.
+
+**4. Fabric Loom cache stale after `strata-core` jar update**
+
+Fabric Loom caches remapped project-dependency jars by content hash in `.gradle/loom-cache/remapped_mods/`. After `strata-core` was rebuilt with the new `ASSET_REGISTERED` event, the stale cached entry for the old jar caused `strata-world` to compile against outdated class files. Fixed by deleting the stale cache entry so Loom regenerated it from the newly-built jar on the next build.
+
 ---
 
 ## 8. File Structure
@@ -640,7 +681,13 @@ dependencies {
 - [x] JUnit 5 test suite — 39 passed, 1 skipped pending GameTest infrastructure
 - [x] VerdantHighlands feature registration via BiomeModifications (vegetation, ores, decoration, springs, lava lakes, monster rooms, freeze layer)
 
-### Phase 2 — Biome Editor MVP
+### Phase 2 — Biome Editor MVP (Complete)
+
+> **⚠ Known gap (Phase 2):** `StrataWandRegistry.register(null)` does not throw
+> `IllegalArgumentException` — when the handler list is empty, the duplicate-ID check loop
+> does not execute, so `HANDLERS.add(null)` succeeds silently and the NPE surfaces
+> downstream in `StrataLogger.debug()`. Flag this for a `fix/` branch before Phase 3.
+
 - **Biome Design World** custom world preset (`Strata: Biome Designer`) — singleplayer-only, natural terrain, Strata Wand auto-given at first spawn with splash message
 - **Strata Wand** item with two Phase 2 interactions: right-click open editor, right-click terrain to sample biome as template
 - **Wand handler registry stub** in `strata-core` (`StrataWandRegistry`) — biome handler only in Phase 2; extensible for future modules

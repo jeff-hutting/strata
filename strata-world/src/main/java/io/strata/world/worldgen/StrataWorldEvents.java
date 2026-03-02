@@ -19,7 +19,10 @@ import java.util.function.Consumer;
  * pipeline documented in the spec (Section 3.1):
  * JSON → StrataBiomes → StrataWorldgen → StrataWorldEvents → overworld.
  *
- * <p>Phase 2 will add BiomeModifications and asset registry listeners here.
+ * <p>Phase 2 added an {@code ASSET_REGISTERED} listener (client-side only) that
+ * calls {@link io.strata.world.editor.BiomeEditorScreen#notifyFeatureListUpdated()}
+ * whenever {@code strata-creator} registers a new custom asset, keeping the Biome
+ * Editor's feature and spawn lists fresh without a game restart.
  */
 public final class StrataWorldEvents {
 

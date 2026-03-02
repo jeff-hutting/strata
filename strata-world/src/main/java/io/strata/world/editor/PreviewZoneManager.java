@@ -38,6 +38,12 @@ public class PreviewZoneManager {
     /** Whether biome blending is enabled (vanilla biomes outside render distance). */
     private boolean biomeBlendingEnabled = false;
 
+    /**
+     * Creates a PreviewZoneManager for the given editor state and undo manager.
+     *
+     * @param state       the editor state whose structural parameters drive regen
+     * @param undoManager the undo manager to receive snapshots before each regen
+     */
     public PreviewZoneManager(BiomeEditorState state, BiomeEditorState.UndoManager undoManager) {
         this.state = state;
         this.undoManager = undoManager;

@@ -2,7 +2,7 @@
 
 > **Version:** 0.1 (Bootstrap)
 > **Target:** Minecraft Java Edition (Fabric)
-> **Status:** In development — `strata-core` Phase 1 complete, `strata-world` Phase 1 complete
+> **Status:** In development — `strata-core` Phase 1 complete, `strata-world` Phase 2 (Biome Editor MVP) complete
 
 ---
 
@@ -334,12 +334,27 @@ When a new Minecraft version releases:
 - [x] Implement player data attachment system
 - [x] Write `strata-core` spec document
 
-### Phase 2 — World (Phase 1 complete)
+### Phase 2a — World Foundation ✓
 - [x] Set up `strata-world` Gradle project
 - [x] Research and spec biome/terrain approach for current MC version
 - [x] Implement first custom biome (VerdantHighlands — proof of concept via Mixin + JSON)
 - [x] ~~Implement TerraBlender integration~~ — decided against; using native Fabric Mixin on `VanillaBiomeParameters` instead (see `strata-world` SPEC §2.1 and §3.6)
 - [x] Register VerdantHighlands features via `BiomeModifications` — avoids "Feature order cycle" crash from inline JSON; see `strata-world` SPEC §2.2 and §3.7
+
+### Phase 2b — Biome Editor MVP ✓
+- [x] Implement `WandHandler` interface and `StrataWandRegistry` in `strata-core`
+- [x] Implement `StrataWand` item with right-click handler and disambiguation logic
+- [x] Register `BiomeEditorWandHandler` for Phase 2 wand interactions
+- [x] Implement `BiomeDesignWorldPreset` (`Strata: Biome Designer` world type, singleplayer-only)
+- [x] Register world preset in vanilla world creation screen via `data/minecraft/tags/worldgen/world_preset/normal.json`
+- [x] Enforce singleplayer-only for Biome Design Worlds (kick extra players on join via `ServerPlayConnectionEvents`)
+- [x] Auto-give Strata Wand + splash message on first spawn in a Biome Design World
+- [x] Implement `BiomeEditorState` (Layer 1/2 properties, undo/redo, draft persistence to `.draft.json`)
+- [x] Implement `PreviewZoneManager` (debounced Layer 2 chunk regen, configurable delays, biome blending toggle)
+- [x] Scaffold `BiomeEditorScreen` (full-screen five-tab panel, header bar, Ctrl+Z/Y keyboard shortcuts)
+- [x] Scaffold all five editor tabs: Visual, Terrain, Features, Spawns, Export
+- [x] Add `ASSET_REGISTERED` event to `strata-core` + client-side listener in `strata-world`
+- [x] Move Layer 1/2 debounce delays and undo depth into `WorldConfig` (config-driven, no hardcoded constants)
 - [ ] Write full biome library (Phase 3 of `strata-world`)
 
 ### Phase 3 — Structures

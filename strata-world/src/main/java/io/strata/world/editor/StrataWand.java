@@ -44,6 +44,26 @@ public class StrataWand extends Item {
         super(settings);
     }
 
+    /**
+     * Handles a right-click with the Strata Wand.
+     *
+     * <p>On the server side, ray-casts up to 5 blocks from the player, queries
+     * {@link StrataWandRegistry} for all handlers that match the interaction
+     * context, and invokes the appropriate editor:
+     * <ul>
+     *   <li>No handlers — shows a "No Strata editor available" action bar message.</li>
+     *   <li>One handler — invoked directly.</li>
+     *   <li>Multiple handlers — currently uses the first match (Phase 3+ will add
+     *       a disambiguation prompt).</li>
+     * </ul>
+     * The client side returns {@link ActionResult#SUCCESS} immediately without
+     * performing any logic, as all routing happens server-side.
+     *
+     * @param world  the world the player is in
+     * @param player the player right-clicking
+     * @param hand   the hand holding the wand
+     * @return {@link ActionResult#SUCCESS} on the client, or the handler result on the server
+     */
     @Override
     public ActionResult use(World world, PlayerEntity player, Hand hand) {
         if (world.isClient()) {

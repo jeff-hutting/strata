@@ -18,6 +18,7 @@ import net.minecraft.world.World;
  */
 public class BiomeEditorWandHandler implements WandHandler {
 
+    /** Unique identifier for this handler, used in disambiguation prompts and logging. */
     public static final String HANDLER_ID = "biome_editor";
 
     @Override

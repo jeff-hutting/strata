@@ -98,6 +98,9 @@ public class BiomeEditorScreen extends Screen {
         }
     }
 
+    /**
+     * Renders the editor screen: background, header bar, tab sidebar, and active tab content.
+     */
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         // Draw background
@@ -138,6 +141,13 @@ public class BiomeEditorScreen extends Screen {
         }
     }
 
+    /**
+     * Handles keyboard input. Ctrl+Z triggers undo; Ctrl+Y triggers redo.
+     * All other keys are delegated to the superclass.
+     *
+     * @param keyInput the key input event
+     * @return {@code true} if the key was consumed
+     */
     @Override
     public boolean keyPressed(KeyInput keyInput) {
         // Ctrl+Z = undo, Ctrl+Y = redo
@@ -171,6 +181,10 @@ public class BiomeEditorScreen extends Screen {
         }
     }
 
+    /**
+     * Returns {@code false} so the game continues ticking while the editor is open,
+     * allowing {@link PreviewZoneManager} debounce timers to fire normally.
+     */
     @Override
     public boolean shouldPause() {
         return false;

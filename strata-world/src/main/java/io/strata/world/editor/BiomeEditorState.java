@@ -373,6 +373,10 @@ public class BiomeEditorState {
 
     /**
      * Represents a mob spawn entry in the biome editor.
+     *
+     * <p>Mirrors vanilla's spawn list format: entity type, spawn weight,
+     * and minimum/maximum group size. Instances live in
+     * {@link BiomeEditorState#spawnEntries}.
      */
     public static class SpawnEntry {
         private String entityId;
@@ -380,8 +384,17 @@ public class BiomeEditorState {
         private int minGroupSize;
         private int maxGroupSize;
 
+        /** No-arg constructor for Gson deserialization. */
         public SpawnEntry() {}
 
+        /**
+         * Creates a spawn entry with all fields specified.
+         *
+         * @param entityId     the namespaced entity type identifier
+         * @param weight       spawn weight relative to other entries in the biome
+         * @param minGroupSize minimum number of entities per spawn attempt
+         * @param maxGroupSize maximum number of entities per spawn attempt
+         */
         public SpawnEntry(String entityId, int weight, int minGroupSize, int maxGroupSize) {
             this.entityId = entityId;
             this.weight = weight;
@@ -389,20 +402,33 @@ public class BiomeEditorState {
             this.maxGroupSize = maxGroupSize;
         }
 
+        /** Returns a deep copy of this spawn entry. */
         public SpawnEntry copy() {
             return new SpawnEntry(entityId, weight, minGroupSize, maxGroupSize);
         }
 
+        /** Returns the namespaced entity type identifier. */
         public String getEntityId() { return entityId; }
+
+        /** Sets the namespaced entity type identifier. */
         public void setEntityId(String entityId) { this.entityId = entityId; }
 
+        /** Returns the spawn weight relative to other entries in the biome. */
         public int getWeight() { return weight; }
+
+        /** Sets the spawn weight. Higher values increase relative spawn probability. */
         public void setWeight(int weight) { this.weight = weight; }
 
+        /** Returns the minimum group size per spawn attempt. */
         public int getMinGroupSize() { return minGroupSize; }
+
+        /** Sets the minimum group size per spawn attempt. */
         public void setMinGroupSize(int minGroupSize) { this.minGroupSize = minGroupSize; }
 
+        /** Returns the maximum group size per spawn attempt. */
         public int getMaxGroupSize() { return maxGroupSize; }
+
+        /** Sets the maximum group size per spawn attempt. */
         public void setMaxGroupSize(int maxGroupSize) { this.maxGroupSize = maxGroupSize; }
     }
 
