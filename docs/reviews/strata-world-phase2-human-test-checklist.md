@@ -6,7 +6,7 @@ _Check off each item in-game before closing the phase._
 
 ## World Creation
 
-- [ ] `Strata: Biome Designer` appears in the world type selector alongside Superflat and Amplified
+- [x] `Strata: Biome Designer` appears in the world type selector alongside Superflat and Amplified
 - [ ] Selecting it and creating a world loads successfully without crashes
 
 ---

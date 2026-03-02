@@ -107,8 +107,10 @@ public final class StrataWorldFeatures {
         addFeature(selector, GenerationStep.Feature.UNDERGROUND_ORES, "ore_copper");
         addFeature(selector, GenerationStep.Feature.UNDERGROUND_ORES, "ore_copper_large");
 
-        // UNDERGROUND_DECORATION — glow lichen, clay deposits
-        addFeature(selector, GenerationStep.Feature.UNDERGROUND_DECORATION, "glow_lichen");
+        // UNDERGROUND_DECORATION — clay deposits (forest-derived)
+        // glow_lichen is intentionally omitted: it is a deep_dark/cave feature. Including it
+        // here with ore_clay added after it inverts the ore_clay → glow_lichen ordering that
+        // vanilla establishes in deep_dark, producing a "Feature order cycle" crash.
         addFeature(selector, GenerationStep.Feature.UNDERGROUND_DECORATION, "ore_clay");
 
         // FLUID_SPRINGS — water and lava springs
