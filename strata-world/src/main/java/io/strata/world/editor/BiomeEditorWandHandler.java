@@ -2,7 +2,10 @@ package io.strata.world.editor;
 
 import io.strata.core.util.StrataLogger;
 import io.strata.core.wand.WandHandler;
+import io.strata.world.network.OpenBiomeEditorPayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.world.World;
 
@@ -51,11 +54,13 @@ public class BiomeEditorWandHandler implements WandHandler {
      */
     @Override
     public void handle(World world, PlayerEntity player, HitResult hit) {
-        // Server-side: the actual screen opening happens client-side
-        // This method triggers the client to open BiomeEditorScreen
-        StrataLogger.debug("Biome editor wand handler invoked for player {}", player.getName().getString());
+        if (!(player instanceof ServerPlayerEntity serverPlayer)) return;
 
-        // TODO: Send packet to client to open BiomeEditorScreen
-        // TODO: If block hit, sample biome at position and send template data
+        StrataLogger.debug("Biome editor wand handler: sending OpenBiomeEditor to {}",
+                player.getName().getString());
+
+        ServerPlayNetworking.send(serverPlayer, new OpenBiomeEditorPayload());
+
+        // TODO Phase 3+: if block hit, sample biome at position and include template data
     }
 }

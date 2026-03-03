@@ -2,6 +2,7 @@ package io.strata.world.editor.tabs;
 
 import io.strata.world.editor.BiomeEditorScreen;
 import io.strata.world.editor.BiomeEditorState;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 
 /**
@@ -46,4 +47,19 @@ public abstract class EditorTab {
      * Renders this tab's content.
      */
     public abstract void render(DrawContext context, int mouseX, int mouseY, float delta);
+
+    /**
+     * Handles a mouse click in the content area.
+     *
+     * <p>Called by {@link BiomeEditorScreen#mouseClicked} for clicks that fall
+     * outside the tab sidebar, before delegating to registered child widgets.
+     * Tabs that need custom hit-testing (e.g. color-swatch rows) override this.
+     *
+     * @param click       carries position ({@code x()}, {@code y()}) and button index
+     * @param doubleClick {@code true} if this is a double-click
+     * @return {@code true} if the click was consumed; {@code false} to pass it on
+     */
+    public boolean mouseClicked(Click click, boolean doubleClick) {
+        return false;
+    }
 }

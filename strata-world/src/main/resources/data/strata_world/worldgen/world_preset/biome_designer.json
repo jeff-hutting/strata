@@ -31,6 +31,18 @@
         },
         "settings": "minecraft:end"
       }
+    },
+    "strata_world:design_marker": {
+      "type": "minecraft:overworld",
+      "generator": {
+        "type": "minecraft:flat",
+        "settings": {
+          "layers": [],
+          "biome": "minecraft:the_void",
+          "features": false,
+          "lakes": false
+        }
+      }
     }
   }
 }

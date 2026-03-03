@@ -40,9 +40,9 @@ public class TerrainTab extends EditorTab {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         var textRenderer = MinecraftClient.getInstance().textRenderer;
         context.drawText(textRenderer,
-                "Terrain Parameters", x + 10, y + 10, 0xFFFFFF, true);
+                "Terrain Parameters", x + 10, y + 10, 0xFFFFFFFF, true);
         context.drawText(textRenderer,
                 "Multi-noise sliders and preview controls will appear here.",
-                x + 10, y + 26, 0x888888, false);
+                x + 10, y + 26, 0xFF888888, false);
     }
 }

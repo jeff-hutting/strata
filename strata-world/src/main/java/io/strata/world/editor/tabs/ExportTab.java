@@ -41,9 +41,9 @@ public class ExportTab extends EditorTab {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         var textRenderer = MinecraftClient.getInstance().textRenderer;
         context.drawText(textRenderer,
-                "Export", x + 10, y + 10, 0xFFFFFF, true);
+                "Export", x + 10, y + 10, 0xFFFFFFFF, true);
         context.drawText(textRenderer,
                 "JSON export, Strata-Pack creation, and metadata fields will appear here.",
-                x + 10, y + 26, 0x888888, false);
+                x + 10, y + 26, 0xFF888888, false);
     }
 }

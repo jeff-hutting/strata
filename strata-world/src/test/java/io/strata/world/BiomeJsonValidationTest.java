@@ -110,21 +110,34 @@ class BiomeJsonValidationTest {
     }
 
     // ---- Features ----
-    // Vegetation features (trees, flowers, grass) are intentionally absent from the biome JSON.
-    // Inline feature lists in biome JSON force explicit ordering constraints that can cause
-    // "Feature order cycle" crashes when shared features appear in different relative orders
-    // across vanilla biomes. Features are registered instead via Fabric's BiomeModifications
-    // API in StrataWorldgen.java, which inserts into the existing vanilla ordering graph.
-    // Feature coverage is validated by the BiomeModificationsTest suite.
+    // Features are declared inline in the biome JSON, mirroring the exact IDs and ordering
+    // from minecraft:forest. This avoids feature-order-cycle crashes that occur when
+    // BiomeModifications introduces ordering constraints conflicting with vanilla's
+    // topological feature graph (notably with minecraft:deep_dark).
 
     @Test
-    void featuresArrayIsEmpty() {
+    void featuresArrayHas11Steps() {
         assertTrue(root.has("features"), "biome JSON must define a features array");
         JsonArray features = root.getAsJsonArray("features");
-        for (int i = 0; i < features.size(); i++) {
-            assertTrue(features.get(i).getAsJsonArray().isEmpty(),
-                    "features step " + i + " must be empty — features are registered via BiomeModifications, not inline JSON");
-        }
+        assertEquals(11, features.size(),
+                "features array must have exactly 11 generation steps (indices 0–10)");
+    }
+
+    @Test
+    void featuresContainExpectedEntries() {
+        JsonArray features = root.getAsJsonArray("features");
+        // Step 1 (LAKES) — must contain lava lakes
+        assertTrue(features.get(1).getAsJsonArray().size() > 0,
+                "step 1 (LAKES) must not be empty");
+        // Step 6 (UNDERGROUND_ORES) — must contain ore features
+        assertTrue(features.get(6).getAsJsonArray().size() > 0,
+                "step 6 (UNDERGROUND_ORES) must not be empty");
+        // Step 9 (VEGETAL_DECORATION) — must contain vegetation features
+        assertTrue(features.get(9).getAsJsonArray().size() > 0,
+                "step 9 (VEGETAL_DECORATION) must not be empty");
+        // Step 10 (TOP_LAYER_MODIFICATION) — must contain freeze layer
+        assertTrue(features.get(10).getAsJsonArray().size() > 0,
+                "step 10 (TOP_LAYER_MODIFICATION) must not be empty");
     }
 
     // ---- Structural requirements ----

@@ -5,6 +5,10 @@
   "mixins": [
     "VanillaBiomeParametersMixin"
   ],
+  "client": [
+    "BiomeMixin",
+    "EnvironmentAttributeMapMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

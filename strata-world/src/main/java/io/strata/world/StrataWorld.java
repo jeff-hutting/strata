@@ -9,9 +9,12 @@ import io.strata.world.config.WorldConfig;
 import io.strata.world.editor.BiomeDesignWorldPreset;
 import io.strata.world.editor.BiomeEditorWandHandler;
 import io.strata.world.editor.StrataWand;
+import io.strata.world.network.OpenBiomeEditorPayload;
 import io.strata.world.worldgen.StrataWorldEvents;
 import io.strata.world.worldgen.StrataWorldgen;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
@@ -51,6 +54,16 @@ public class StrataWorld implements ModInitializer {
         BiomeDesignWorldPreset.initialize();
         StrataWand.register();
         StrataWandRegistry.register(new BiomeEditorWandHandler());
+
+        // Register S2C payload types — must happen on both sides in onInitialize()
+        // (not in the client initializer) so the server is aware of the packet.
+        PayloadTypeRegistry.playS2C().register(
+                OpenBiomeEditorPayload.ID, OpenBiomeEditorPayload.CODEC);
+
+        // Cache Biome Design World detection at SERVER_STARTING — before any player connects.
+        // This ensures isCurrentWorldBiomeDesignWorld() never reads level.dat on the hot path,
+        // and that INFO-level logs in cacheWorldType() always appear in latest.log for debugging.
+        ServerLifecycleEvents.SERVER_STARTING.register(BiomeDesignWorldPreset::cacheWorldType);
 
         // Issue #1 — Singleplayer enforcement: kick non-host players in a Biome Design World.
         // Biome Design Worlds are singleplayer-only per SPEC §7.0. Only the first connected

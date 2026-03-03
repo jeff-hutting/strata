@@ -7,14 +7,14 @@ _Check off each item in-game before closing the phase._
 ## World Creation
 
 - [x] `Strata: Biome Designer` appears in the world type selector alongside Superflat and Amplified
-- [ ] Selecting it and creating a world loads successfully without crashes
+- [x] Selecting it and creating a world loads successfully without crashes
 
 ---
 
 ## First Spawn
 
-- [ ] Strata Wand is in the player's main hand on first spawn
-- [ ] Splash message `"Welcome to the Strata Biome Designer. Your wand is ready."` appears
+- [x] Strata Wand is in the player's main hand on first spawn
+- [x] Splash message `"Welcome to the Strata Biome Designer. Your wand is ready."` appears
 - [ ] Wand is NOT re-given on subsequent spawns / respawns (die and respawn to verify)
 
 ---
@@ -30,7 +30,7 @@ _Check off each item in-game before closing the phase._
 ## Wand — Editor Open
 
 - [ ] Right-clicking in open air opens the Biome Editor screen
-- [ ] All five tabs are visible and navigable: **Visual**, **Terrain**, **Features**, **Spawns**, **Export**
+- [x] All five tabs are visible and navigable: **Visual**, **Terrain**, **Features**, **Spawns**, **Export**
 - [ ] Display name field in header is editable inline (click pencil icon)
 - [ ] Auto-derived biome ID updates when display name changes
       (e.g. typing `"Frost Peaks"` produces `strata_world:frost_peaks`)
