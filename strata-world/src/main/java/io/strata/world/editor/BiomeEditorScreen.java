@@ -271,14 +271,28 @@ public class BiomeEditorScreen extends Screen {
     private void performUndo() {
         BiomeEditorState previous = state.getUndoManager().undo(state);
         if (previous != null) {
-            // TODO: apply previous state to the editor
+            state.restoreFrom(previous);
+            // Rebuild widgets to reflect the restored state
+            clearChildren();
+            init();
+            // Trigger a chunk reload so mesh-baked colors update
+            var mc = MinecraftClient.getInstance();
+            if (mc.worldRenderer != null) {
+                mc.worldRenderer.reload();
+            }
         }
     }
 
     private void performRedo() {
         BiomeEditorState next = state.getUndoManager().redo(state);
         if (next != null) {
-            // TODO: apply next state to the editor
+            state.restoreFrom(next);
+            clearChildren();
+            init();
+            var mc = MinecraftClient.getInstance();
+            if (mc.worldRenderer != null) {
+                mc.worldRenderer.reload();
+            }
         }
     }
 

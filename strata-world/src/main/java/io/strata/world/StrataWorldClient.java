@@ -96,7 +96,8 @@ public class StrataWorldClient implements ClientModInitializer {
             }
         });
 
-        // TODO: Register keybindings for undo/redo
+        // Undo/redo keybindings (Ctrl+Z / Ctrl+Y) are handled directly in
+        // BiomeEditorScreen.keyPressed() — no global KeyBinding registration needed.
 
         StrataLogger.debug("strata-world client initialized.");
     }
