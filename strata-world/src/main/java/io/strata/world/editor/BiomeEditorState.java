@@ -126,6 +126,41 @@ public class BiomeEditorState {
         return copy;
     }
 
+    /**
+     * Restores all property fields from the given snapshot, preserving this
+     * object's identity and {@link UndoManager}. Used by undo/redo to apply
+     * a previous or next state without replacing the state object reference.
+     *
+     * @param snapshot the state to copy fields from
+     */
+    public void restoreFrom(BiomeEditorState snapshot) {
+        this.displayName = snapshot.displayName;
+        this.biomeId = snapshot.biomeId;
+        this.biomeIdOverridden = snapshot.biomeIdOverridden;
+        this.skyColor = snapshot.skyColor;
+        this.fogColor = snapshot.fogColor;
+        this.waterColor = snapshot.waterColor;
+        this.waterFogColor = snapshot.waterFogColor;
+        this.grassColor = snapshot.grassColor;
+        this.foliageColor = snapshot.foliageColor;
+        this.hasRain = snapshot.hasRain;
+        this.hasSnow = snapshot.hasSnow;
+        this.temperature = snapshot.temperature;
+        this.humidity = snapshot.humidity;
+        this.continentalness = snapshot.continentalness;
+        this.erosion = snapshot.erosion;
+        this.weirdness = snapshot.weirdness;
+        this.depth = snapshot.depth;
+        this.features = new ArrayList<>(snapshot.features);
+        this.spawnEntries = new ArrayList<>();
+        for (SpawnEntry entry : snapshot.spawnEntries) {
+            this.spawnEntries.add(entry.copy());
+        }
+        this.activeTab = snapshot.activeTab;
+        this.dirty = true;
+        this.exported = false;
+    }
+
     // --- Display Name / Biome ID ---
 
     /** Returns the human-readable display name. */
