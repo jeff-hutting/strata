@@ -520,6 +520,135 @@ Subagents are most useful when tasks are truly independent. If Agent 2's output 
 
 ---
 
+## Agent Teams (Phase 3 Kickoff and Beyond)
+
+Agent Teams is an experimental Claude Code feature that goes further than subagents. Subagents report results back to the main agent and cannot talk to each other. Teammates are fully independent Claude Code sessions that share a task list, can message each other directly, and self-claim work without the lead dispatching every step. This makes them better suited for work that requires cross-teammate discussion — parallel reviewers comparing notes, or developers who need to negotiate a shared interface before writing code on each side of it.
+
+**Requirement:** iTerm2 with the `it2` CLI on your PATH (already the case for this project). Agent Teams is already enabled in `.claude/settings.json` via `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+
+### When to Use Agent Teams vs. Subagents
+
+| Situation | Use |
+|---|---|
+| Parallel independent content (3 new biomes, no shared files) | Subagents — lower overhead |
+| Sequential bug fixes and polish on existing code | Neither — single session |
+| Finishing a nearly-complete phase | Neither — single session |
+| Launching a new phase with multiple independent modules | **Agent Teams** |
+| Parallel code review from different specialist lenses | **Agent Teams** (reviewers compare and challenge each other) |
+| Debugging with competing hypotheses | **Agent Teams** (teammates argue against each other's theories) |
+
+### The Right Moment for Phase 3
+
+Use Agent Teams **at the start of Phase 3**, not to finish Phase 2. The right trigger is: you have a written Phase 3 spec, Phase 2 is merged to main, and you have 3+ independent new modules or systems to build simultaneously.
+
+Do **not** use Agent Teams for:
+- Polishing or fixing items in a nearly-complete phase (file conflicts, no real parallelism benefit)
+- Any task where teammates would need to edit the same file
+- Sequential workflows where each step depends on the last
+
+### File Ownership is Mandatory
+
+Two teammates editing the same file will overwrite each other. Before spawning a team, explicitly assign file ownership in the prompt. For strata-world, natural ownership boundaries are:
+
+| Owner | Files |
+|---|---|
+| Teammate A | A new biome: its JSON file + its registration in `StrataBiomes.java` + its noise params in `StrataWorldgen.java` |
+| Teammate B | A different biome — same file types, zero overlap |
+| Teammate C | A new editor system: its tab class under `editor/tabs/` + any new state fields in `BiomeEditorState.java` |
+| Teammate D | Tests only: `src/test/` — never touches implementation files |
+| Teammate E | Docs only: `docs/` — Scribe role, never touches implementation files |
+
+### Phase 3 Kickoff — Lead Prompt Template
+
+Paste this into a fresh Claude Code session (Opus recommended for the lead) at the start of Phase 3:
+
+```
+You are the team lead for a Phase 3 strata-world implementation sprint.
+
+Before doing anything else, read:
+- docs/ARCHITECTURE.md
+- docs/mods/strata-world/SPEC.md
+- docs/workflow/CLAUDE_CODE_GUIDE.md (the Agent Teams section)
+
+Your job is to:
+1. Plan the parallel work for this sprint based on the Phase 3 spec items listed below.
+2. Spawn 3–4 teammates (Sonnet model), assigning each a clearly bounded set of files.
+3. Give each teammate an explicit context prompt that includes:
+   - Which files they own (list them)
+   - Which files they must NOT touch
+   - The "Starting a Session" golden rule from CLAUDE_CODE_GUIDE.md
+   - Their specific deliverable
+4. Synthesize results when teammates complete their work. Report any conflicts or blockers.
+
+Phase 3 items for this sprint: [describe what to build, e.g., "two new biomes: CrimsonBadlands
+and FrostPeaks; full PreviewZoneManager server-side regen; biome browser panel in the editor"]
+
+File ownership rules for this project:
+- Each biome is one JSON file + one registration block in StrataBiomes.java — assign one biome per teammate.
+- Editor tab files (editor/tabs/*.java) are one per teammate — never shared.
+- BiomeEditorState.java is high-conflict; only one teammate may touch it.
+- Test files (src/test/) and doc files (docs/) are safe for a dedicated teammate each.
+
+Do not start writing code yet — confirm the team plan with me first.
+```
+
+### Parallel Review — Specialist Team Template
+
+Use this after a major implementation, instead of (or in addition to) the sequential Reviewer role:
+
+```
+Spawn three reviewer teammates, each with a different lens. Use Sonnet for each.
+Give each teammate this context first:
+  Read docs/ARCHITECTURE.md and docs/mods/strata-world/SPEC.md.
+  Your only job is to review — do NOT modify any code.
+
+- Reviewer 1 — Fabric correctness: Fabric API usage, Mixin registrations in strata_world.mixins.json,
+  no direct access to vanilla internals, MC 1.21.11 API quirks documented in the handoff prompt.
+- Reviewer 2 — State and thread safety: BiomeEditorState mutation patterns, UndoManager snapshot
+  timing, client-only code paths, no server-side calls from client mixins.
+- Reviewer 3 — Build system and conventions: naming (mod ID strata_world, package io.strata.world),
+  no hardcoded config values (all in WorldConfig), Javadoc on public methods,
+  conventional commit hygiene.
+
+Have each reviewer write findings to a separate temp file:
+  docs/reviews/phase3-review-fabric.md
+  docs/reviews/phase3-review-state.md
+  docs/reviews/phase3-review-conventions.md
+
+After all three are done, have them discuss any overlapping findings and consolidate into
+docs/reviews/strata-world-phase3-review.md. Then report the consolidated list to me.
+```
+
+### Competing Hypotheses — Debug Team Template
+
+Use when a bug has multiple plausible root causes and you want to investigate them in parallel:
+
+```
+There is a bug: [describe symptom exactly].
+
+Spawn 3 teammates to investigate competing hypotheses. Each teammate should:
+1. Read docs/ARCHITECTURE.md and the relevant files for their hypothesis.
+2. Argue for their hypothesis with specific evidence from the code.
+3. Then actively try to find evidence that *disproves* their own hypothesis.
+4. Report their conclusion (confirmed / disproved / inconclusive) with code references.
+
+- Teammate 1 hypothesis: The bug is in [area A — e.g., the mixin not applying correctly]
+- Teammate 2 hypothesis: The bug is in [area B — e.g., the debounce timer firing at the wrong time]
+- Teammate 3 hypothesis: The bug is in [area C — e.g., state not being read on the correct thread]
+
+After each teammate reports, discuss findings together. Write the consensus root cause
+and proposed fix to docs/reviews/debug-[short-name].md, then report to me.
+```
+
+### Known Limitations
+
+- **`/resume` and `/rewind` do not restore in-process teammates.** After resuming a session, the lead may try to message teammates that no longer exist. Spawn fresh teammates after any resume.
+- **Task status can lag.** If a teammate finishes but doesn't mark its task done, the lead may stall. Nudge the lead: *"Check if Teammate 2's work is actually complete and update the task list."*
+- **One team per session.** Clean up a team before starting a new one.
+- **Token cost scales with team size.** 3–4 teammates is the right ceiling for this codebase. Five or more rarely pays off.
+
+---
+
 ## Reviewing Claude Code's Work
 
 Claude Code will show you diffs of every file it changes. **Always review these before accepting.**
@@ -701,7 +830,7 @@ The confirmation step is important — it surfaces any gaps in understanding bef
 | `docs/reviews/<module>-<phase>-human-test-checklist.md` | Tester output — in-game / subjective checks for Jeff to complete |
 | `docs/conventions/` | Detailed coding conventions (naming, patterns, etc.) |
 | `.claude/commands/commit.md` | `/commit` slash command — conventional commit format for Strata |
-| `.claude/settings.json` | Committed project permissions — pre-approves common dev commands |
+| `.claude/settings.json` | Committed project permissions — pre-approves common dev commands; enables `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` |
 
 ---
 
