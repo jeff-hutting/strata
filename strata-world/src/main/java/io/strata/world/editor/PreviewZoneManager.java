@@ -1,26 +1,19 @@
 package io.strata.world.editor;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
 import io.strata.core.config.StrataConfigHelper;
 import io.strata.core.util.StrataLogger;
 import io.strata.world.config.WorldConfig;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.WorldSavePath;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.biome.Biome;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.Optional;
 
 /**
  * Manages debounced chunk regeneration for the Biome Editor preview zone.
@@ -81,6 +74,15 @@ public class PreviewZoneManager {
     }
 
     /**
+     * Cancels any pending Layer 1 snapshot.
+     * Called when the active tab switches so that widget-initialization listeners
+     * don't fire a spurious snapshot and pollute the undo stack.
+     */
+    public void cancelLayer1Snapshot() {
+        lastLayer1ChangeTime = -1;
+    }
+
+    /**
      * Called every client tick. Checks whether debounce timers have expired
      * and triggers chunk regeneration or snapshot capture as needed.
      * Debounce durations are read from {@link WorldConfig} so they can be
@@ -124,16 +126,15 @@ public class PreviewZoneManager {
     /** Minimum duration to show the "Refreshing preview..." indicator (ms). */
     private static final long REGEN_INDICATOR_MIN_MS = 1000L;
 
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-
     /**
      * Triggers chunk regeneration of the preview zone.
      * Captures an undo snapshot before regeneration.
      *
-     * <p>Writes the current biome JSON to the world's datapack folder, reloads
-     * datapacks on the server, deletes region files, and triggers a client
-     * chunk reload. This ensures features, spawns, and biome properties
-     * take effect in the regenerated chunks.
+     * <p>Updates the in-memory dynamic generation settings (features and spawns)
+     * on the editor_preview biome, then forces nearby chunks to regenerate so
+     * the changes are visible in the world. No datapack reload is required because
+     * {@code editor_preview.json} is bundled in the mod JAR and the biome object
+     * is mutated in-memory via the accessor mixin.
      */
     private void triggerRegeneration() {
         undoManager.captureSnapshot(state);
@@ -147,15 +148,18 @@ public class PreviewZoneManager {
         MinecraftServer server = mc.getServer();
 
         if (server != null) {
-            // Write the biome JSON to the datapack so features/spawns take effect
-            writeBiomeToDatapack(server);
-
-            // Reload datapacks on the server thread, then clear chunks
             server.execute(() -> {
-                reloadAndRegenerateChunks(server, mc);
+                // Ensure override is set (may not be if this is the first regen)
+                initBiomeOverrideIfNeeded(server);
+                // Update in-memory features and spawns on the preview biome
+                ServerWorld overworld = server.getOverworld();
+                if (overworld != null) {
+                    BiomeEditorSession.updateDynamicFeatures(overworld, state.getFeatures());
+                    BiomeEditorSession.updateDynamicSpawnSettings(state.getSpawnEntries());
+                }
+                regenerateNearbyChunks(server, mc);
             });
         } else {
-            // Fallback: just reload client rendering
             if (mc.worldRenderer != null) {
                 mc.worldRenderer.reload();
             }
@@ -172,11 +176,11 @@ public class PreviewZoneManager {
     }
 
     /**
-     * Resets the entire world — writes current biome to datapack, reloads,
-     * clears all region files, and regenerates from scratch.
+     * Resets the entire world — updates dynamic settings, clears all region
+     * files, and forces a full chunk regeneration.
      */
     public void resetWorld() {
-        StrataLogger.info("Resetting Design World — writing datapack, clearing chunks, regenerating");
+        StrataLogger.info("Resetting Design World — clearing chunks, regenerating");
 
         MinecraftClient mc = MinecraftClient.getInstance();
         MinecraftServer server = mc.getServer();
@@ -185,13 +189,18 @@ public class PreviewZoneManager {
         regenerating = true;
         regenStartTime = System.currentTimeMillis();
 
-        writeBiomeToDatapack(server);
-
         server.execute(() -> {
+            initBiomeOverrideIfNeeded(server);
+            ServerWorld overworld = server.getOverworld();
+            if (overworld != null) {
+                BiomeEditorSession.updateDynamicFeatures(overworld, state.getFeatures());
+                BiomeEditorSession.updateDynamicSpawnSettings(state.getSpawnEntries());
+            }
+
             // Save all world data before deleting region files
             server.saveAll(false, true, true);
 
-            // Delete overworld region files so chunks regenerate fresh
+            // Delete overworld region files so all chunks regenerate fresh
             Path worldRoot = server.getSavePath(WorldSavePath.ROOT);
             Path regionDir = worldRoot.resolve("region");
             if (Files.isDirectory(regionDir)) {
@@ -205,7 +214,7 @@ public class PreviewZoneManager {
                 }
             }
 
-            reloadAndRegenerateChunks(server, mc);
+            regenerateNearbyChunks(server, mc);
         });
     }
 
@@ -247,101 +256,50 @@ public class PreviewZoneManager {
         StrataLogger.debug("Biome blending {}", enabled ? "enabled" : "disabled");
     }
 
-    // ── Datapack + Server Reload Helpers ─────────────────────────────────────
+    // ── Chunk Regen Helpers ───────────────────────────────────────────────────
 
     /**
-     * Writes the current biome state as the {@code editor_preview} datapack biome.
-     * Always uses the fixed ID {@link BiomeEditorSession#EDITOR_PREVIEW_ID} so the
-     * biome source mixin can reliably return it at every position.
+     * Looks up {@code strata_world:editor_preview} from the biome registry and sets
+     * it as the server-side override. No-ops if already set.
+     * Must be called on the server thread.
      */
-    private void writeBiomeToDatapack(MinecraftServer server) {
-        Path worldRoot = server.getSavePath(WorldSavePath.ROOT);
-        Path datapackDir = worldRoot.resolve("datapacks")
-                .resolve("strata-custom-biomes")
-                .resolve("data")
-                .resolve("strata_world")
-                .resolve("worldgen")
-                .resolve("biome");
-        Path biomeFile = datapackDir.resolve("editor_preview.json");
-
-        try {
-            Files.createDirectories(datapackDir);
-
-            // Write pack.mcmeta if missing
-            Path packMcmeta = worldRoot.resolve("datapacks")
-                    .resolve("strata-custom-biomes")
-                    .resolve("pack.mcmeta");
-            if (!Files.exists(packMcmeta)) {
-                JsonObject pack = new JsonObject();
-                JsonObject packInfo = new JsonObject();
-                packInfo.addProperty("pack_format", 48); // MC 1.21.x
-                packInfo.addProperty("description", "Custom biomes created with Strata World");
-                pack.add("pack", packInfo);
-                Files.writeString(packMcmeta, GSON.toJson(pack));
-            }
-
-            Files.writeString(biomeFile, state.buildBiomeJson());
-            StrataLogger.debug("Wrote editor_preview biome JSON to datapack: {}", biomeFile);
-        } catch (IOException e) {
-            StrataLogger.error("Failed to write biome to datapack: {}", e.getMessage());
-        }
+    private void initBiomeOverrideIfNeeded(MinecraftServer server) {
+        if (BiomeEditorSession.getServerBiomeOverride() != null) return;
+        ServerWorld overworld = server.getOverworld();
+        if (overworld == null) return;
+        overworld.getRegistryManager()
+                .getOptional(RegistryKeys.BIOME)
+                .flatMap(reg -> reg.getOptional(BiomeEditorSession.EDITOR_PREVIEW_KEY))
+                .ifPresent(entry -> {
+                    BiomeEditorSession.setServerBiomeOverride(entry);
+                    StrataLogger.info("Set server biome override to editor_preview");
+                });
     }
 
     /**
-     * Reloads server datapacks, sets the biome override, and triggers chunk regeneration.
+     * Teleports the player in-place (to force the server to unload and regenerate
+     * nearby chunks) then reloads client-side chunk rendering.
      * Must be called on the server thread.
      */
-    private void reloadAndRegenerateChunks(MinecraftServer server, MinecraftClient mc) {
-        // Reload datapacks so the editor_preview biome definition takes effect
-        Collection<String> enabledPacks = server.getDataPackManager().getEnabledIds();
-        server.reloadResources(enabledPacks).thenAccept(v -> {
-            StrataLogger.debug("Datapacks reloaded successfully.");
-
-            // Look up the editor_preview biome from the registry and set as override
+    private void regenerateNearbyChunks(MinecraftServer server, MinecraftClient mc) {
+        if (mc.player != null) {
             ServerWorld overworld = server.getOverworld();
             if (overworld != null) {
-                Optional<RegistryEntry.Reference<Biome>> biomeEntry = overworld
-                        .getRegistryManager()
-                        .getOptional(RegistryKeys.BIOME)
-                        .flatMap(reg -> reg.getOptional(BiomeEditorSession.EDITOR_PREVIEW_KEY));
-                if (biomeEntry.isPresent()) {
-                    BiomeEditorSession.setServerBiomeOverride(biomeEntry.get());
-                    StrataLogger.info("Set server biome override to editor_preview");
-                } else {
-                    StrataLogger.warn("editor_preview biome not found in registry after reload");
-                }
-
-                // Teleport player to force chunk reload around them
-                if (mc.player != null) {
-                    BlockPos pos = mc.player.getBlockPos();
-                    server.execute(() -> {
-                        var serverPlayer = overworld.getServer()
-                                .getPlayerManager().getPlayer(mc.player.getUuid());
-                        if (serverPlayer != null) {
-                            serverPlayer.teleport(overworld,
-                                    pos.getX(), pos.getY(), pos.getZ(),
-                                    java.util.Set.of(), serverPlayer.getYaw(),
-                                    serverPlayer.getPitch(), true);
-                        }
-                    });
+                var serverPlayer = server.getPlayerManager().getPlayer(mc.player.getUuid());
+                if (serverPlayer != null) {
+                    BlockPos pos = serverPlayer.getBlockPos();
+                    serverPlayer.teleport(overworld,
+                            pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5,
+                            java.util.Set.of(), serverPlayer.getYaw(),
+                            serverPlayer.getPitch(), true);
                 }
             }
-
-            // Client-side: reload all chunk rendering
-            mc.execute(() -> {
-                if (mc.worldRenderer != null) {
-                    mc.worldRenderer.reload();
-                    StrataLogger.debug("Triggered worldRenderer.reload() after datapack reload");
-                }
-            });
-        }).exceptionally(e -> {
-            StrataLogger.error("Datapack reload failed: {}", e.getMessage());
-            mc.execute(() -> {
-                if (mc.worldRenderer != null) {
-                    mc.worldRenderer.reload();
-                }
-            });
-            return null;
+        }
+        mc.execute(() -> {
+            if (mc.worldRenderer != null) {
+                mc.worldRenderer.reload();
+                StrataLogger.debug("Triggered worldRenderer.reload() after chunk regen");
+            }
         });
     }
 }

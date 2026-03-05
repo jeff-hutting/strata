@@ -3,6 +3,8 @@
   "package": "io.strata.world.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "BiomeGenerationMixin",
+    "GenerationSettingsAccessor",
     "MultiNoiseBiomeSourceMixin",
     "VanillaBiomeParametersMixin"
   ],

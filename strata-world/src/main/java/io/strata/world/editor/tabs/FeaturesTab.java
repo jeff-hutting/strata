@@ -45,7 +45,11 @@ public class FeaturesTab extends EditorTab {
     /** Filtered feature suggestions shown below the text field. */
     private List<String> suggestions = List.of();
     private int selectedSuggestion = -1;
-    private static final int MAX_SUGGESTIONS = 6;
+    private int suggestionScrollOffset = 0;
+    /** Maximum number of suggestions fetched from the registry. */
+    private static final int MAX_SUGGESTIONS = 20;
+    /** Maximum number of suggestions visible in the dropdown at once. */
+    private static final int MAX_VISIBLE_SUGGESTIONS = 8;
     private static final int SUGGESTION_HEIGHT = 12;
 
     public FeaturesTab(BiomeEditorScreen screen, BiomeEditorState state) {
@@ -98,6 +102,7 @@ public class FeaturesTab extends EditorTab {
                 }
                 suggestions = found;
                 selectedSuggestion = suggestions.isEmpty() ? -1 : 0;
+                suggestionScrollOffset = 0;
             }
         });
         screen.addTabWidget(addField);
@@ -139,16 +144,18 @@ public class FeaturesTab extends EditorTab {
         int mx = (int) click.x();
         int my = (int) click.y();
 
-        // Hit-test suggestion dropdown
+        // Hit-test suggestion dropdown (only visible rows)
         if (addField != null && addField.isFocused() && !suggestions.isEmpty()) {
             int sugX = addField.getX();
             int sugY = addField.getY() + addField.getHeight() + 1;
             int sugW = addField.getWidth();
-            for (int si = 0; si < suggestions.size(); si++) {
-                int rowTop = sugY + si * SUGGESTION_HEIGHT;
+            int visibleCount = Math.min(MAX_VISIBLE_SUGGESTIONS, suggestions.size() - suggestionScrollOffset);
+            for (int vi = 0; vi < visibleCount; vi++) {
+                int rowTop = sugY + vi * SUGGESTION_HEIGHT;
                 if (mx >= sugX && mx < sugX + sugW && my >= rowTop && my < rowTop + SUGGESTION_HEIGHT) {
-                    addField.setText(suggestions.get(si));
+                    addField.setText(suggestions.get(suggestionScrollOffset + vi));
                     suggestions = List.of();
+                    suggestionScrollOffset = 0;
                     return true;
                 }
             }
@@ -189,10 +196,16 @@ public class FeaturesTab extends EditorTab {
         int key = keyInput.key();
         if (key == GLFW.GLFW_KEY_DOWN) {
             selectedSuggestion = Math.min(selectedSuggestion + 1, suggestions.size() - 1);
+            if (selectedSuggestion >= suggestionScrollOffset + MAX_VISIBLE_SUGGESTIONS) {
+                suggestionScrollOffset = selectedSuggestion - MAX_VISIBLE_SUGGESTIONS + 1;
+            }
             return true;
         }
         if (key == GLFW.GLFW_KEY_UP) {
             selectedSuggestion = Math.max(selectedSuggestion - 1, 0);
+            if (selectedSuggestion < suggestionScrollOffset) {
+                suggestionScrollOffset = selectedSuggestion;
+            }
             return true;
         }
         if (key == GLFW.GLFW_KEY_TAB || key == GLFW.GLFW_KEY_ENTER) {
@@ -200,12 +213,14 @@ public class FeaturesTab extends EditorTab {
                 addField.setText(suggestions.get(selectedSuggestion));
                 suggestions = List.of();
                 selectedSuggestion = -1;
+                suggestionScrollOffset = 0;
                 return true;
             }
         }
         if (key == GLFW.GLFW_KEY_ESCAPE) {
             suggestions = List.of();
             selectedSuggestion = -1;
+            suggestionScrollOffset = 0;
             return true;
         }
         return false;
@@ -293,10 +308,17 @@ public class FeaturesTab extends EditorTab {
             int sugX = addField.getX();
             int sugY = addField.getY() + addField.getHeight() + 1;
             int sugW = addField.getWidth();
-            context.fill(sugX, sugY, sugX + sugW, sugY + suggestions.size() * SUGGESTION_HEIGHT, 0xF0222244);
+            int visibleCount = Math.min(MAX_VISIBLE_SUGGESTIONS, suggestions.size() - suggestionScrollOffset);
+            int totalH = visibleCount * SUGGESTION_HEIGHT;
+            context.fill(sugX, sugY, sugX + sugW, sugY + totalH, 0xF0222244);
             context.fill(sugX, sugY, sugX + sugW, sugY + 1, 0xFF4A90D9);
-            for (int si = 0; si < suggestions.size(); si++) {
-                int rowTop = sugY + si * SUGGESTION_HEIGHT;
+            // Scroll indicator at bottom if more entries below
+            if (suggestionScrollOffset + visibleCount < suggestions.size()) {
+                context.fill(sugX, sugY + totalH - 1, sugX + sugW, sugY + totalH, 0xFF4A90D9);
+            }
+            for (int vi = 0; vi < visibleCount; vi++) {
+                int si = suggestionScrollOffset + vi;
+                int rowTop = sugY + vi * SUGGESTION_HEIGHT;
                 boolean isSelected = (si == selectedSuggestion);
                 boolean hovered = mouseX >= sugX && mouseX < sugX + sugW
                         && mouseY >= rowTop && mouseY < rowTop + SUGGESTION_HEIGHT;

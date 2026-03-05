@@ -123,6 +123,8 @@ public class BiomeEditorScreen extends Screen {
         if (tabIndex >= 0 && tabIndex < tabs.size()) {
             this.activeTabIndex = tabIndex;
             this.state.setActiveTab(tabIndex);
+            PreviewZoneManager pzm = BiomeEditorSession.getPreviewZoneManager();
+            if (pzm != null) pzm.cancelLayer1Snapshot();
             clearChildren();
             init();
         }

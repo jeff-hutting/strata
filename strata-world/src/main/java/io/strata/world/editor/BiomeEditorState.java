@@ -463,13 +463,13 @@ public class BiomeEditorState {
         effects.add("mood_sound", moodSound);
         root.add("effects", effects);
 
-        // Features — all in generation step 10 (vegetal_decoration)
+        // Features — vegetal_decoration is step 9 (index 9), top_layer_modification is step 10
         JsonArray featureSteps = new JsonArray();
-        for (int i = 0; i < 11; i++) featureSteps.add(new JsonArray());
+        for (int i = 0; i < 9; i++) featureSteps.add(new JsonArray()); // steps 0–8 empty
         JsonArray vegetalStep = new JsonArray();
         for (String feature : features) vegetalStep.add(feature);
-        featureSteps.add(vegetalStep);
-        featureSteps.add(new JsonArray()); // step 11
+        featureSteps.add(vegetalStep);           // step 9 = vegetal_decoration
+        featureSteps.add(new JsonArray());        // step 10 = top_layer_modification
         root.add("features", featureSteps);
 
         // Spawners
