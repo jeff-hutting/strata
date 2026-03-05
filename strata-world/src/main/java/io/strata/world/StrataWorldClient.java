@@ -129,6 +129,12 @@ public class StrataWorldClient implements ClientModInitializer {
                     if (restored != null) {
                         BiomeEditorSession.open(restored);
                         StrataLogger.debug("Auto-restored BiomeEditorSession from draft on world join: {}", draftPath);
+                        // Write editor_preview biome to datapack and set server override
+                        // so chunk generation uses the editor's biome from the start.
+                        PreviewZoneManager pzm = BiomeEditorSession.getPreviewZoneManager();
+                        if (pzm != null) {
+                            pzm.forceRegeneration();
+                        }
                         // Defer the chunk reload by ~40 ticks (~2 seconds) to let the world
                         // renderer initialize fully before requesting a mesh rebuild.
                         scheduleChunkReload(client, 40);

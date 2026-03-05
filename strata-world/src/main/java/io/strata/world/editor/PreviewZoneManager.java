@@ -7,16 +7,20 @@ import io.strata.core.config.StrataConfigHelper;
 import io.strata.core.util.StrataLogger;
 import io.strata.world.config.WorldConfig;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.WorldSavePath;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.biome.Biome;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Optional;
 
 /**
  * Manages debounced chunk regeneration for the Biome Editor preview zone.
@@ -246,24 +250,11 @@ public class PreviewZoneManager {
     // ── Datapack + Server Reload Helpers ─────────────────────────────────────
 
     /**
-     * Writes the current biome state as a datapack biome JSON file.
-     * Creates the pack.mcmeta if it doesn't exist.
+     * Writes the current biome state as the {@code editor_preview} datapack biome.
+     * Always uses the fixed ID {@link BiomeEditorSession#EDITOR_PREVIEW_ID} so the
+     * biome source mixin can reliably return it at every position.
      */
     private void writeBiomeToDatapack(MinecraftServer server) {
-        String biomeId = state.getBiomeId();
-        if (biomeId.isEmpty() || !biomeId.contains(":")) {
-            // Auto-derive from display name if empty
-            if (!state.getDisplayName().isEmpty()) {
-                state.setDisplayName(state.getDisplayName());
-                biomeId = state.getBiomeId();
-            }
-            if (biomeId.isEmpty() || !biomeId.contains(":")) {
-                StrataLogger.warn("Cannot write biome to datapack — no biome ID set.");
-                return;
-            }
-        }
-
-        String idPath = biomeId.split(":", 2)[1];
         Path worldRoot = server.getSavePath(WorldSavePath.ROOT);
         Path datapackDir = worldRoot.resolve("datapacks")
                 .resolve("strata-custom-biomes")
@@ -271,7 +262,7 @@ public class PreviewZoneManager {
                 .resolve("strata_world")
                 .resolve("worldgen")
                 .resolve("biome");
-        Path biomeFile = datapackDir.resolve(idPath + ".json");
+        Path biomeFile = datapackDir.resolve("editor_preview.json");
 
         try {
             Files.createDirectories(datapackDir);
@@ -290,25 +281,36 @@ public class PreviewZoneManager {
             }
 
             Files.writeString(biomeFile, state.buildBiomeJson());
-            StrataLogger.debug("Wrote biome JSON to datapack: {}", biomeFile);
+            StrataLogger.debug("Wrote editor_preview biome JSON to datapack: {}", biomeFile);
         } catch (IOException e) {
             StrataLogger.error("Failed to write biome to datapack: {}", e.getMessage());
         }
     }
 
     /**
-     * Reloads server datapacks and triggers chunk regeneration.
+     * Reloads server datapacks, sets the biome override, and triggers chunk regeneration.
      * Must be called on the server thread.
      */
     private void reloadAndRegenerateChunks(MinecraftServer server, MinecraftClient mc) {
-        // Reload datapacks so the biome definition takes effect
+        // Reload datapacks so the editor_preview biome definition takes effect
         Collection<String> enabledPacks = server.getDataPackManager().getEnabledIds();
         server.reloadResources(enabledPacks).thenAccept(v -> {
             StrataLogger.debug("Datapacks reloaded successfully.");
 
-            // Unload all chunks from the overworld so they regenerate fresh
+            // Look up the editor_preview biome from the registry and set as override
             ServerWorld overworld = server.getOverworld();
             if (overworld != null) {
+                Optional<RegistryEntry.Reference<Biome>> biomeEntry = overworld
+                        .getRegistryManager()
+                        .getOptional(RegistryKeys.BIOME)
+                        .flatMap(reg -> reg.getOptional(BiomeEditorSession.EDITOR_PREVIEW_KEY));
+                if (biomeEntry.isPresent()) {
+                    BiomeEditorSession.setServerBiomeOverride(biomeEntry.get());
+                    StrataLogger.info("Set server biome override to editor_preview");
+                } else {
+                    StrataLogger.warn("editor_preview biome not found in registry after reload");
+                }
+
                 // Teleport player to force chunk reload around them
                 if (mc.player != null) {
                     BlockPos pos = mc.player.getBlockPos();
@@ -334,7 +336,6 @@ public class PreviewZoneManager {
             });
         }).exceptionally(e -> {
             StrataLogger.error("Datapack reload failed: {}", e.getMessage());
-            // Still reload client rendering even if datapack reload failed
             mc.execute(() -> {
                 if (mc.worldRenderer != null) {
                     mc.worldRenderer.reload();

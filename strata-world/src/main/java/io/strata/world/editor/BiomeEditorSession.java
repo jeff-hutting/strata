@@ -1,25 +1,40 @@
 package io.strata.world.editor;
 
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.biome.Biome;
+
 /**
- * Client-side singleton that tracks whether the Biome Editor is currently open.
+ * Singleton that tracks the active Biome Editor session.
  *
- * <p>Mixins ({@code BiomeMixin}, {@code EnvironmentAttributeMapMixin}) read this
- * class to decide whether to substitute Layer 1 visual values from the active
- * editor state instead of the real biome data. The overrides are applied to
- * <em>all</em> biomes while the editor is open; in practice this only affects
- * the preview world where the strata biome dominates.
+ * <p>Mixins ({@code BiomeMixin}, {@code EnvironmentAttributeMapMixin},
+ * {@code MultiNoiseBiomeSourceMixin}) read this class to substitute editor
+ * values during rendering and chunk generation. In a Design World, the
+ * biome source mixin returns the editor's preview biome at every position.
  *
  * <p>This class has no client-only imports so it can be safely referenced from
- * common-code call sites (e.g. the Mixin injectors). The {@link PreviewZoneManager}
- * field is typed by reference only and is not eagerly loaded.
- *
- * <p>Call {@link #open(BiomeEditorState)} when the {@link BiomeEditorScreen} is
- * created and {@link #close()} from {@link BiomeEditorScreen#removed()}.
+ * common-code call sites (e.g. server-side Mixin injectors).
  */
 public final class BiomeEditorSession {
 
+    /** Fixed biome ID used for the editor preview biome in datapacks. */
+    public static final String EDITOR_PREVIEW_ID = "strata_world:editor_preview";
+
+    /** Registry key for the editor preview biome. */
+    public static final RegistryKey<Biome> EDITOR_PREVIEW_KEY =
+            RegistryKey.of(RegistryKeys.BIOME, Identifier.of("strata_world", "editor_preview"));
+
     private static volatile BiomeEditorState active = null;
     private static volatile PreviewZoneManager previewZoneManager = null;
+
+    /**
+     * Server-side biome override. When non-null, the MultiNoiseBiomeSourceMixin
+     * returns this instead of the vanilla biome at every position (in Design Worlds).
+     * Set after datapack reload when the editor_preview biome is registered.
+     */
+    private static volatile RegistryEntry<Biome> serverBiomeOverride = null;
 
     private BiomeEditorSession() {}
 
@@ -62,5 +77,28 @@ public final class BiomeEditorSession {
     /** Returns {@code true} if an editor session is currently active. */
     public static boolean isActive() {
         return active != null;
+    }
+
+    /**
+     * Sets the server-side biome override used by the biome source mixin.
+     * Called after datapack reload when the editor_preview biome is registered.
+     */
+    public static void setServerBiomeOverride(RegistryEntry<Biome> biome) {
+        serverBiomeOverride = biome;
+    }
+
+    /**
+     * Returns the server-side biome override, or null if not set.
+     * Called by MultiNoiseBiomeSourceMixin on every biome lookup during chunk generation.
+     */
+    public static RegistryEntry<Biome> getServerBiomeOverride() {
+        return serverBiomeOverride;
+    }
+
+    /**
+     * Clears the server biome override. Called on server stop.
+     */
+    public static void clearServerBiomeOverride() {
+        serverBiomeOverride = null;
     }
 }

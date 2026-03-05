@@ -7,6 +7,7 @@ import io.strata.core.wand.StrataWandRegistry;
 import io.strata.world.biome.StrataBiomes;
 import io.strata.world.config.WorldConfig;
 import io.strata.world.editor.BiomeDesignWorldPreset;
+import io.strata.world.editor.BiomeEditorSession;
 import io.strata.world.editor.BiomeEditorWandHandler;
 import io.strata.world.editor.StrataWand;
 import io.strata.world.network.BiomeSamplePayload;
@@ -67,6 +68,10 @@ public class StrataWorld implements ModInitializer {
         // This ensures isCurrentWorldBiomeDesignWorld() never reads level.dat on the hot path,
         // and that INFO-level logs in cacheWorldType() always appear in latest.log for debugging.
         ServerLifecycleEvents.SERVER_STARTING.register(BiomeDesignWorldPreset::cacheWorldType);
+
+        // Clear the server biome override when the server stops to prevent stale references
+        ServerLifecycleEvents.SERVER_STOPPING.register(server ->
+                BiomeEditorSession.clearServerBiomeOverride());
 
         // Issue #1 — Singleplayer enforcement: kick non-host players in a Biome Design World.
         // Biome Design Worlds are singleplayer-only per SPEC §7.0. Only the host player
