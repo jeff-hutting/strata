@@ -6,6 +6,7 @@ import io.strata.world.editor.BiomeEditorScreen;
 import io.strata.world.editor.BiomeEditorSession;
 import io.strata.world.editor.BiomeEditorState;
 import io.strata.world.editor.PreviewZoneManager;
+import io.strata.world.network.BiomeSamplePayload;
 import io.strata.world.network.OpenBiomeEditorPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -71,6 +72,17 @@ public class StrataWorldClient implements ClientModInitializer {
                         }
                     }
                     context.client().setScreen(new BiomeEditorScreen(state));
+                }));
+
+        // S2C: server sends biome sample data — open editor with sampled biome properties.
+        ClientPlayNetworking.registerGlobalReceiver(BiomeSamplePayload.ID,
+                (payload, context) -> context.client().execute(() -> {
+                    BiomeEditorState state = BiomeEditorState.fromSampleJson(payload.biomeJson());
+                    if (state != null) {
+                        StrataLogger.debug("Loaded biome template from sample: {}",
+                                state.getDisplayName());
+                        context.client().setScreen(new BiomeEditorScreen(state));
+                    }
                 }));
 
         // Save the editor state to disk and then clear the session when the player

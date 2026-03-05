@@ -4,6 +4,10 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.strata.core.util.StrataLogger;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -363,6 +367,62 @@ public class BiomeEditorState {
      */
     public static BiomeEditorState fromJson(String json) {
         return GSON.fromJson(json, BiomeEditorState.class);
+    }
+
+    /**
+     * Creates a BiomeEditorState from a biome sample JSON sent by the server.
+     * Populates visual and structural properties from the sampled biome.
+     *
+     * @param json the JSON string from the BiomeSamplePayload
+     * @return a new state populated from the sample, or null on error
+     */
+    public static BiomeEditorState fromSampleJson(String json) {
+        try {
+            JsonObject obj = GSON.fromJson(json, JsonObject.class);
+            BiomeEditorState state = new BiomeEditorState();
+
+            if (obj.has("displayName")) state.displayName = obj.get("displayName").getAsString();
+            if (obj.has("biomeId")) {
+                state.biomeId = obj.get("biomeId").getAsString();
+                state.biomeIdOverridden = true;
+            }
+
+            // Layer 1
+            if (obj.has("skyColor")) state.skyColor = obj.get("skyColor").getAsInt();
+            if (obj.has("fogColor")) state.fogColor = obj.get("fogColor").getAsInt();
+            if (obj.has("waterColor")) state.waterColor = obj.get("waterColor").getAsInt();
+            if (obj.has("waterFogColor")) state.waterFogColor = obj.get("waterFogColor").getAsInt();
+            if (obj.has("grassColor")) state.grassColor = obj.get("grassColor").getAsInt();
+            if (obj.has("foliageColor")) state.foliageColor = obj.get("foliageColor").getAsInt();
+            if (obj.has("hasRain")) state.hasRain = obj.get("hasRain").getAsBoolean();
+            if (obj.has("hasSnow")) state.hasSnow = obj.get("hasSnow").getAsBoolean();
+
+            // Layer 2
+            if (obj.has("temperature")) state.temperature = obj.get("temperature").getAsFloat();
+            if (obj.has("humidity")) state.humidity = obj.get("humidity").getAsFloat();
+
+            // Spawn entries
+            if (obj.has("spawnEntries")) {
+                JsonArray spawns = obj.getAsJsonArray("spawnEntries");
+                for (JsonElement el : spawns) {
+                    JsonObject s = el.getAsJsonObject();
+                    SpawnEntry entry = new SpawnEntry(
+                            s.get("entityId").getAsString(),
+                            s.has("weight") ? s.get("weight").getAsInt() : 10,
+                            s.has("minGroupSize") ? s.get("minGroupSize").getAsInt() : 1,
+                            s.has("maxGroupSize") ? s.get("maxGroupSize").getAsInt() : 4
+                    );
+                    state.spawnEntries.add(entry);
+                }
+            }
+
+            state.dirty = true;
+            state.exported = false;
+            return state;
+        } catch (Exception e) {
+            StrataLogger.error("Failed to parse biome sample JSON: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**

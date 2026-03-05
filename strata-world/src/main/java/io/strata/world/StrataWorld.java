@@ -9,6 +9,7 @@ import io.strata.world.config.WorldConfig;
 import io.strata.world.editor.BiomeDesignWorldPreset;
 import io.strata.world.editor.BiomeEditorWandHandler;
 import io.strata.world.editor.StrataWand;
+import io.strata.world.network.BiomeSamplePayload;
 import io.strata.world.network.OpenBiomeEditorPayload;
 import io.strata.world.worldgen.StrataWorldEvents;
 import io.strata.world.worldgen.StrataWorldgen;
@@ -59,6 +60,8 @@ public class StrataWorld implements ModInitializer {
         // (not in the client initializer) so the server is aware of the packet.
         PayloadTypeRegistry.playS2C().register(
                 OpenBiomeEditorPayload.ID, OpenBiomeEditorPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(
+                BiomeSamplePayload.ID, BiomeSamplePayload.CODEC);
 
         // Cache Biome Design World detection at SERVER_STARTING — before any player connects.
         // This ensures isCurrentWorldBiomeDesignWorld() never reads level.dat on the hot path,
