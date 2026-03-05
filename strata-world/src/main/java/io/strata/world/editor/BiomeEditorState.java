@@ -355,7 +355,7 @@ public class BiomeEditorState {
      */
     public UndoManager getUndoManager() {
         if (undoManager == null) {
-            undoManager = new UndoManager(20);
+            undoManager = new UndoManager(50);
         }
         return undoManager;
     }

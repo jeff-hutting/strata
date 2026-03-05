@@ -9,9 +9,11 @@ import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +44,7 @@ public class FeaturesTab extends EditorTab {
 
     /** Filtered feature suggestions shown below the text field. */
     private List<String> suggestions = List.of();
+    private int selectedSuggestion = -1;
     private static final int MAX_SUGGESTIONS = 6;
     private static final int SUGGESTION_HEIGHT = 12;
 
@@ -73,21 +76,28 @@ public class FeaturesTab extends EditorTab {
             String query = text.strip().toLowerCase();
             if (query.isEmpty()) {
                 suggestions = List.of();
+                selectedSuggestion = -1;
             } else {
-                // Use world's dynamic registry for placed features
+                // Try server registry (singleplayer), then client world registry
                 var mc = MinecraftClient.getInstance();
-                if (mc.world != null) {
-                    var registry = mc.world.getRegistryManager()
-                            .getOptional(RegistryKeys.PLACED_FEATURE);
-                    if (registry.isPresent()) {
-                        suggestions = registry.get().getIds().stream()
-                                .map(Identifier::toString)
-                                .filter(id -> id.contains(query))
-                                .sorted()
-                                .limit(MAX_SUGGESTIONS)
-                                .collect(Collectors.toList());
+                List<String> found = List.of();
+                if (mc.getServer() != null) {
+                    var serverOverworld = mc.getServer().getOverworld();
+                    if (serverOverworld != null) {
+                        var reg = serverOverworld.getRegistryManager()
+                                .getOptional(RegistryKeys.PLACED_FEATURE);
+                        if (reg.isPresent()) {
+                            found = reg.get().getIds().stream()
+                                    .map(Identifier::toString)
+                                    .filter(id -> id.contains(query))
+                                    .sorted()
+                                    .limit(MAX_SUGGESTIONS)
+                                    .collect(Collectors.toList());
+                        }
                     }
                 }
+                suggestions = found;
+                selectedSuggestion = suggestions.isEmpty() ? -1 : 0;
             }
         });
         screen.addTabWidget(addField);
@@ -167,6 +177,36 @@ public class FeaturesTab extends EditorTab {
                     return true;
                 }
             }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean keyPressed(KeyInput keyInput) {
+        if (addField == null || !addField.isFocused() || suggestions.isEmpty()) {
+            return false;
+        }
+        int key = keyInput.key();
+        if (key == GLFW.GLFW_KEY_DOWN) {
+            selectedSuggestion = Math.min(selectedSuggestion + 1, suggestions.size() - 1);
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_UP) {
+            selectedSuggestion = Math.max(selectedSuggestion - 1, 0);
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_TAB || key == GLFW.GLFW_KEY_ENTER) {
+            if (selectedSuggestion >= 0 && selectedSuggestion < suggestions.size()) {
+                addField.setText(suggestions.get(selectedSuggestion));
+                suggestions = List.of();
+                selectedSuggestion = -1;
+                return true;
+            }
+        }
+        if (key == GLFW.GLFW_KEY_ESCAPE) {
+            suggestions = List.of();
+            selectedSuggestion = -1;
+            return true;
         }
         return false;
     }
@@ -257,12 +297,16 @@ public class FeaturesTab extends EditorTab {
             context.fill(sugX, sugY, sugX + sugW, sugY + 1, 0xFF4A90D9);
             for (int si = 0; si < suggestions.size(); si++) {
                 int rowTop = sugY + si * SUGGESTION_HEIGHT;
+                boolean isSelected = (si == selectedSuggestion);
                 boolean hovered = mouseX >= sugX && mouseX < sugX + sugW
                         && mouseY >= rowTop && mouseY < rowTop + SUGGESTION_HEIGHT;
-                if (hovered) {
+                if (isSelected) {
+                    context.fill(sugX, rowTop, sugX + sugW, rowTop + SUGGESTION_HEIGHT, 0x60FFFFFF);
+                } else if (hovered) {
                     context.fill(sugX, rowTop, sugX + sugW, rowTop + SUGGESTION_HEIGHT, 0x40FFFFFF);
                 }
-                context.drawText(tr, suggestions.get(si), sugX + 3, rowTop + 2, 0xFFCCCCCC, false);
+                int textColor = isSelected ? 0xFFFFFFFF : 0xFFCCCCCC;
+                context.drawText(tr, suggestions.get(si), sugX + 3, rowTop + 2, textColor, false);
             }
         }
     }

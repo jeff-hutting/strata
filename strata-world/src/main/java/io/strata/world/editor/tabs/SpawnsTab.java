@@ -10,9 +10,11 @@ import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +53,7 @@ public class SpawnsTab extends EditorTab {
 
     /** Filtered entity suggestions shown below the text field. */
     private List<String> suggestions = List.of();
+    private int selectedSuggestion = -1;
     private static final int MAX_SUGGESTIONS = 6;
     private static final int SUGGESTION_HEIGHT = 12;
 
@@ -82,12 +85,15 @@ public class SpawnsTab extends EditorTab {
             String query = text.strip().toLowerCase();
             if (query.isEmpty()) {
                 suggestions = List.of();
+                selectedSuggestion = -1;
             } else {
                 suggestions = Registries.ENTITY_TYPE.getIds().stream()
                         .map(Identifier::toString)
                         .filter(id -> id.contains(query))
+                        .sorted()
                         .limit(MAX_SUGGESTIONS)
                         .collect(Collectors.toList());
+                selectedSuggestion = suggestions.isEmpty() ? -1 : 0;
             }
         });
         screen.addTabWidget(entityField);
@@ -230,6 +236,36 @@ public class SpawnsTab extends EditorTab {
         return false;
     }
 
+    @Override
+    public boolean keyPressed(KeyInput keyInput) {
+        if (entityField == null || !entityField.isFocused() || suggestions.isEmpty()) {
+            return false;
+        }
+        int key = keyInput.key();
+        if (key == GLFW.GLFW_KEY_DOWN) {
+            selectedSuggestion = Math.min(selectedSuggestion + 1, suggestions.size() - 1);
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_UP) {
+            selectedSuggestion = Math.max(selectedSuggestion - 1, 0);
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_TAB || key == GLFW.GLFW_KEY_ENTER) {
+            if (selectedSuggestion >= 0 && selectedSuggestion < suggestions.size()) {
+                entityField.setText(suggestions.get(selectedSuggestion));
+                suggestions = List.of();
+                selectedSuggestion = -1;
+                return true;
+            }
+        }
+        if (key == GLFW.GLFW_KEY_ESCAPE) {
+            suggestions = List.of();
+            selectedSuggestion = -1;
+            return true;
+        }
+        return false;
+    }
+
     // ── Render ───────────────────────────────────────────────────────────────
 
     @Override
@@ -331,12 +367,16 @@ public class SpawnsTab extends EditorTab {
             context.fill(sugX, sugY, sugX + sugW, sugY + 1, 0xFF4A90D9); // top border
             for (int si = 0; si < suggestions.size(); si++) {
                 int rowTop = sugY + si * SUGGESTION_HEIGHT;
+                boolean isSelected = (si == selectedSuggestion);
                 boolean hovered = mouseX >= sugX && mouseX < sugX + sugW
                         && mouseY >= rowTop && mouseY < rowTop + SUGGESTION_HEIGHT;
-                if (hovered) {
+                if (isSelected) {
+                    context.fill(sugX, rowTop, sugX + sugW, rowTop + SUGGESTION_HEIGHT, 0x60FFFFFF);
+                } else if (hovered) {
                     context.fill(sugX, rowTop, sugX + sugW, rowTop + SUGGESTION_HEIGHT, 0x40FFFFFF);
                 }
-                context.drawText(tr, suggestions.get(si), sugX + 3, rowTop + 2, 0xFFCCCCCC, false);
+                int textColor = isSelected ? 0xFFFFFFFF : 0xFFCCCCCC;
+                context.drawText(tr, suggestions.get(si), sugX + 3, rowTop + 2, textColor, false);
             }
         }
     }

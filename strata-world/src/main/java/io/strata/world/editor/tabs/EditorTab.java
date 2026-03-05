@@ -4,6 +4,7 @@ import io.strata.world.editor.BiomeEditorScreen;
 import io.strata.world.editor.BiomeEditorState;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.input.KeyInput;
 
 /**
  * Base class for Biome Editor tabs.
@@ -60,6 +61,17 @@ public abstract class EditorTab {
      * @return {@code true} if the click was consumed; {@code false} to pass it on
      */
     public boolean mouseClicked(Click click, boolean doubleClick) {
+        return false;
+    }
+
+    /**
+     * Handles a key press in the content area.
+     * Called before BiomeEditorScreen's tab navigation handling.
+     *
+     * @param keyInput the key input event
+     * @return {@code true} if the key was consumed; {@code false} to pass it on
+     */
+    public boolean keyPressed(KeyInput keyInput) {
         return false;
     }
 }

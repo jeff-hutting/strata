@@ -286,6 +286,13 @@ public class BiomeEditorScreen extends Screen {
             if (keyInput.key() == GLFW.GLFW_KEY_Y) { performRedo(); return true; }
         }
 
+        // ── Delegate to active tab (e.g. suggestion list navigation) ───────────
+        if (activeTabIndex >= 0 && activeTabIndex < tabs.size()) {
+            if (tabs.get(activeTabIndex).keyPressed(keyInput)) {
+                return true;
+            }
+        }
+
         // ── Tab sidebar navigation ─────────────────────────────────────────────
         boolean shiftHeld = InputUtil.isKeyPressed(window, GLFW.GLFW_KEY_LEFT_SHIFT)
                 || InputUtil.isKeyPressed(window, GLFW.GLFW_KEY_RIGHT_SHIFT);
