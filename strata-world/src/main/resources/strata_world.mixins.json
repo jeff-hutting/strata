@@ -7,7 +7,8 @@
   ],
   "client": [
     "BiomeMixin",
-    "EnvironmentAttributeMapMixin"
+    "EnvironmentAttributeMapMixin",
+    "IntegratedServerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

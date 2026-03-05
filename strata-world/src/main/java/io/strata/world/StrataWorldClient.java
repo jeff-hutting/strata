@@ -75,13 +75,28 @@ public class StrataWorldClient implements ClientModInitializer {
                 }));
 
         // S2C: server sends biome sample data — open editor with sampled biome properties.
+        // If the current session has unsaved changes, capture an undo snapshot before replacing.
         ClientPlayNetworking.registerGlobalReceiver(BiomeSamplePayload.ID,
                 (payload, context) -> context.client().execute(() -> {
-                    BiomeEditorState state = BiomeEditorState.fromSampleJson(payload.biomeJson());
-                    if (state != null) {
+                    BiomeEditorState sampled = BiomeEditorState.fromSampleJson(payload.biomeJson());
+                    if (sampled == null) return;
+
+                    if (BiomeEditorSession.isActive()) {
+                        BiomeEditorState current = BiomeEditorSession.getActive();
+                        if (current.isDirty() && !current.isExported()) {
+                            // Capture undo snapshot so sampling is reversible
+                            current.getUndoManager().captureSnapshot(current);
+                            StrataLogger.debug("Captured undo snapshot before biome sampling");
+                        }
+                        // Apply sampled values to the active state
+                        current.restoreFrom(sampled);
+                        StrataLogger.debug("Applied sampled biome template: {}",
+                                sampled.getDisplayName());
+                        context.client().setScreen(new BiomeEditorScreen(current));
+                    } else {
                         StrataLogger.debug("Loaded biome template from sample: {}",
-                                state.getDisplayName());
-                        context.client().setScreen(new BiomeEditorScreen(state));
+                                sampled.getDisplayName());
+                        context.client().setScreen(new BiomeEditorScreen(sampled));
                     }
                 }));
 
