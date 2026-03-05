@@ -81,15 +81,17 @@ public class BiomeEditorScreen extends Screen {
         super.init();
 
         // ── Header bar: editable display name field ──────────────────────────
+        // "Name:" label is drawn in renderHeader(); the field sits to its right.
+        int nameFieldX = TAB_SIDEBAR_WIDTH + 50;
         displayNameField = new TextFieldWidget(
                 textRenderer,
-                TAB_SIDEBAR_WIDTH + 8, 6, Math.min(width - TAB_SIDEBAR_WIDTH - 20, 200), 16,
+                nameFieldX, 5, Math.min(width - nameFieldX - 80, 200), 16,
                 Text.literal("Biome display name"));
         displayNameField.setMaxLength(64);
         displayNameField.setText(state.getDisplayName().isEmpty() ? "" : state.getDisplayName());
         displayNameField.setPlaceholder(Text.literal("Untitled Biome"));
-        displayNameField.setDrawsBackground(false);
-        // When the field loses focus or Enter is pressed, update the display name & biome ID
+        displayNameField.setDrawsBackground(true);
+        // Update the display name & auto-derived biome ID on every keystroke
         displayNameField.setChangedListener(text -> {
             String stripped = text.strip();
             if (!stripped.equals(state.getDisplayName())) {
@@ -147,10 +149,7 @@ public class BiomeEditorScreen extends Screen {
      */
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Render child widgets (none yet — all TODOs in init()).
-        super.render(context, mouseX, mouseY, delta);
-
-        // === Background fills (all colors are ARGB) ===
+        // === Background fills FIRST (all colors are ARGB) ===
         // Full-screen near-opaque dark overlay
         context.fill(0, 0, width, height, 0xD0101010);
         // Header bar (dark navy)
@@ -161,21 +160,28 @@ public class BiomeEditorScreen extends Screen {
         context.fill(0, HEADER_HEIGHT, TAB_SIDEBAR_WIDTH, height, 0xFF16213E);
         // Sidebar right border (blue accent)
         context.fill(TAB_SIDEBAR_WIDTH - 1, HEADER_HEIGHT, TAB_SIDEBAR_WIDTH, height, 0xFF4A90D9);
+        // Content area — lighter background so widgets (buttons, sliders, text fields) are readable
+        context.fill(TAB_SIDEBAR_WIDTH, HEADER_HEIGHT, width, height, 0xC0202038);
 
-        // === Text and tab content ===
+        // === Text labels and tab content (behind widgets) ===
         renderHeader(context, mouseX, mouseY);
         renderTabSidebar(context, mouseX, mouseY);
 
         if (activeTabIndex >= 0 && activeTabIndex < tabs.size()) {
             tabs.get(activeTabIndex).render(context, mouseX, mouseY, delta);
         }
+
+        // === Child widgets (buttons, sliders, text fields) rendered LAST = on top ===
+        super.render(context, mouseX, mouseY, delta);
     }
 
     private void renderHeader(DrawContext context, int mouseX, int mouseY) {
-        // The display name is rendered by the TextFieldWidget (added in init()).
-        // Below the field, show the auto-derived biome ID.
+        // "Name:" label to the left of the display name text field
+        context.drawText(textRenderer, "Name:", TAB_SIDEBAR_WIDTH + 8, 8, 0xFFCCCCCC, false);
+
+        // Below the display name field, show the auto-derived biome ID
         String biomeId = state.getBiomeId().isEmpty() ? "strata_world:untitled" : state.getBiomeId();
-        context.drawText(textRenderer, biomeId, TAB_SIDEBAR_WIDTH + 10, 26, 0xFFAAAAAA, false);
+        context.drawText(textRenderer, biomeId, TAB_SIDEBAR_WIDTH + 8, 26, 0xFFAAAAAA, false);
 
         // Unsaved/unexported indicator on the right side of the header
         if (!state.isExported() && state.isDirty()) {

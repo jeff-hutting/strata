@@ -16,9 +16,12 @@ import net.minecraft.text.Text;
 import net.minecraft.util.WorldSavePath;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Export tab — biome JSON export and datapack creation.
@@ -74,12 +77,12 @@ public class ExportTab extends EditorTab {
         authorField.setPlaceholder(Text.literal("Player"));
         screen.addTabWidget(authorField);
 
-        // Apply name button
+        // Apply name button — also syncs to the header display name field
         screen.addTabWidget(ButtonWidget.builder(Text.literal("Set Name"), b -> {
             String name = nameField.getText().strip();
             if (!name.isEmpty()) {
                 state.setDisplayName(name);
-                setStatus("Name updated to: " + name);
+                setStatus("Name set: " + name + " -> " + state.getBiomeId());
             }
         }).dimensions(x + 84 + fieldW, y + 30, 60, 14).build());
 
@@ -99,10 +102,15 @@ public class ExportTab extends EditorTab {
             saveBiomeToDatapack();
         }).dimensions(x + 10, btnY + 24, btnW, 18).build());
 
+        // Export Strata-Pack
+        screen.addTabWidget(ButtonWidget.builder(Text.literal("Export Strata-Pack"), b -> {
+            exportStrataPack();
+        }).dimensions(x + 10, btnY + 48, btnW, 18).build());
+
         // Save draft
         screen.addTabWidget(ButtonWidget.builder(Text.literal("Save Draft"), b -> {
             saveDraft();
-        }).dimensions(x + 10, btnY + 48, btnW, 18).build());
+        }).dimensions(x + 10, btnY + 72, btnW, 18).build());
     }
 
     // ── Export logic ─────────────────────────────────────────────────────────
@@ -194,9 +202,14 @@ public class ExportTab extends EditorTab {
             return;
         }
 
+        // Auto-derive biome ID from display name if not yet set
         String biomeId = state.getBiomeId();
+        if ((biomeId.isEmpty() || !biomeId.contains(":")) && !state.getDisplayName().isEmpty()) {
+            state.setDisplayName(state.getDisplayName()); // triggers auto-derive
+            biomeId = state.getBiomeId();
+        }
         if (biomeId.isEmpty() || !biomeId.contains(":")) {
-            setStatus("Set a biome name first!");
+            setStatus("Set a biome name first (in the header Name field).");
             return;
         }
 
@@ -242,6 +255,82 @@ public class ExportTab extends EditorTab {
         } catch (IOException e) {
             setStatus("Export failed: " + e.getMessage());
             StrataLogger.error("Failed to export biome: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Exports the biome as a Strata-Pack (.stratapack) ZIP archive containing
+     * the biome JSON, en_us.json lang entry, and strata-pack.json manifest.
+     */
+    private void exportStrataPack() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.getServer() == null) {
+            setStatus("Export only works in singleplayer worlds.");
+            return;
+        }
+
+        String biomeId = state.getBiomeId();
+        if ((biomeId.isEmpty() || !biomeId.contains(":")) && !state.getDisplayName().isEmpty()) {
+            state.setDisplayName(state.getDisplayName());
+            biomeId = state.getBiomeId();
+        }
+        if (biomeId.isEmpty() || !biomeId.contains(":")) {
+            setStatus("Set a biome name first (in the header Name field).");
+            return;
+        }
+
+        String idPath = biomeId.split(":", 2)[1];
+        String author = authorField != null ? authorField.getText().strip() : "";
+        if (author.isEmpty()) author = "Unknown";
+
+        Path worldRoot = mc.getServer().getSavePath(WorldSavePath.ROOT);
+        Path packDir = worldRoot.resolve("strata_biomes");
+        Path packFile = packDir.resolve(idPath + ".stratapack");
+
+        try {
+            Files.createDirectories(packDir);
+
+            String biomeJson = buildBiomeJson();
+
+            // Manifest
+            JsonObject manifest = new JsonObject();
+            manifest.addProperty("name", state.getDisplayName());
+            manifest.addProperty("author", author);
+            manifest.addProperty("description", "Created with Strata Biome Editor");
+            manifest.addProperty("version", "1.0.0");
+            manifest.addProperty("strata_version", "0.1.0");
+            JsonObject contents = new JsonObject();
+            com.google.gson.JsonArray biomes = new com.google.gson.JsonArray();
+            biomes.add(idPath);
+            contents.add("biomes", biomes);
+            manifest.add("contents", contents);
+
+            // Lang entry
+            JsonObject lang = new JsonObject();
+            lang.addProperty("biome.strata_world." + idPath, state.getDisplayName());
+
+            // Write ZIP
+            try (OutputStream fos = Files.newOutputStream(packFile);
+                 ZipOutputStream zos = new ZipOutputStream(fos)) {
+                zos.putNextEntry(new ZipEntry("strata-pack.json"));
+                zos.write(GSON.toJson(manifest).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                zos.putNextEntry(new ZipEntry("content/biomes/" + idPath + ".json"));
+                zos.write(biomeJson.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                zos.putNextEntry(new ZipEntry("content/lang/en_us.json"));
+                zos.write(GSON.toJson(lang).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                zos.closeEntry();
+            }
+
+            state.markExported();
+            setStatus("Exported: " + packFile.getFileName());
+            StrataLogger.info("Exported Strata-Pack to {}", packFile);
+        } catch (IOException e) {
+            setStatus("Export failed: " + e.getMessage());
+            StrataLogger.error("Failed to export Strata-Pack: {}", e.getMessage());
         }
     }
 
@@ -297,7 +386,7 @@ public class ExportTab extends EditorTab {
         }
 
         // JSON preview snippet
-        int previewY = y + 160;
+        int previewY = y + 184;
         context.drawText(tr, "JSON Preview:", x + 10, previewY, 0xFF888888, false);
         String json = buildBiomeJson();
         String[] lines = json.split("\n");

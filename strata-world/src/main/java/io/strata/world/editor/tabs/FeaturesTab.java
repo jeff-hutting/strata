@@ -52,12 +52,12 @@ public class FeaturesTab extends EditorTab {
     public void init(int x, int y, int width, int height) {
         super.init(x, y, width, height);
 
-        int fieldW = Math.min(width - 80, 240);
+        int fieldW = Math.min(width - 120, 200);
 
-        // Text field for entering feature identifiers
+        // Text field for entering feature identifiers — after "Feature:" label
         addField = new TextFieldWidget(
                 MinecraftClient.getInstance().textRenderer,
-                x + 10, y + 28, fieldW, 14,
+                x + 60, y + 28, fieldW, 14,
                 Text.literal("Feature ID"));
         addField.setMaxLength(128);
         addField.setPlaceholder(Text.literal("minecraft:trees_birch_and_oak"));
@@ -72,7 +72,7 @@ public class FeaturesTab extends EditorTab {
                 addField.setText("");
                 notifyLayer2Changed();
             }
-        }).dimensions(x + 14 + fieldW, y + 28, 40, 14).build());
+        }).dimensions(x + 64 + fieldW, y + 28, 40, 14).build());
 
         // Clear All button
         screen.addTabWidget(ButtonWidget.builder(Text.literal("Clear All"), b -> {
@@ -137,6 +137,9 @@ public class FeaturesTab extends EditorTab {
         List<String> features = state.getFeatures();
         context.drawText(tr, "Features (" + features.size() + ")",
                 x + 10, y + 10, 0xFFFFFFFF, true);
+
+        // "Feature ID:" label to the left of the text field
+        context.drawText(tr, "Feature:", x + 10, y + 31, 0xFFCCCCCC, false);
 
         // Feature list area
         int listY = y + 50;

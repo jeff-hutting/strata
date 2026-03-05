@@ -61,12 +61,12 @@ public class SpawnsTab extends EditorTab {
     public void init(int x, int y, int width, int height) {
         super.init(x, y, width, height);
 
-        int fieldW = Math.min(width - 80, 200);
+        int fieldW = Math.min(width - 120, 180);
 
-        // Entity ID text field
+        // Entity ID text field — positioned after "Entity:" label drawn in render()
         entityField = new TextFieldWidget(
                 MinecraftClient.getInstance().textRenderer,
-                x + 10, y + 28, fieldW, 14,
+                x + 60, y + 28, fieldW, 14,
                 Text.literal("Entity ID"));
         entityField.setMaxLength(128);
         entityField.setPlaceholder(Text.literal("minecraft:pig"));
@@ -84,7 +84,7 @@ public class SpawnsTab extends EditorTab {
                 refreshEditFields();
                 notifyLayer2Changed();
             }
-        }).dimensions(x + 14 + fieldW, y + 28, 40, 14).build());
+        }).dimensions(x + 64 + fieldW, y + 28, 40, 14).build());
 
         // Inline edit fields for selected entry (below the list)
         int editY = y + height - 60;
@@ -204,6 +204,9 @@ public class SpawnsTab extends EditorTab {
         List<SpawnEntry> entries = state.getSpawnEntries();
         context.drawText(tr, "Mob Spawns (" + entries.size() + ")",
                 x + 10, y + 10, 0xFFFFFFFF, true);
+
+        // "Entity:" label to the left of the entity text field
+        context.drawText(tr, "Entity:", x + 10, y + 31, 0xFFCCCCCC, false);
 
         // Column headers
         int listY = y + 50;
