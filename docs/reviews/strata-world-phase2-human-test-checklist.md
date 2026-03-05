@@ -56,8 +56,10 @@ Current findings are noted under each task or section header, indicated by `NOTE
 - [x] Sampling a vanilla biome (Badlands, Forest, Flower Forest, etc.) works
 - [ ] Unsaved-change prompt appears when a draft is in progress and sampling would replace it
       ~~NOTE (code fix applied): Sampling now captures undo snapshot before replacing draft, making it reversible via Ctrl+Z. No modal dialog — uses undo instead. Needs re-test.~~
-      NOTE: Ctrl-Z works, but only a small, finite number of time (10 maybe?). We need to increase this undo cache (or make it selectable), or give a warning when sampling a new biome without saving.
-      NOTE (code fix applied): Increased undo depth from 20 to 50. Needs re-test.
+      ~~NOTE: Ctrl-Z works, but only a small, finite number of time (10 maybe?). We need to increase this undo cache (or make it selectable), or give a warning when sampling a new biome without saving.~~
+      ~~NOTE (code fix applied): Increased undo depth from 20 to 50. Needs re-test.~~
+      ~~NOTE: The Undo only seems to apply in the current tab. When I switch to a new tab, and then come back, I can no longer undo.~~
+      NOTE (code fix applied): Tab switches now call cancelLayer1Snapshot() before clearChildren()/init(), preventing spurious snapshot on widget initialization. Undo stack should be preserved across tab switches. Needs re-test.
 
 ---
 
@@ -65,7 +67,8 @@ Current findings are noted under each task or section header, indicated by `NOTE
 
 - [ ] Changing a Terrain slider (noise parameter) triggers chunk regen after approximately 3 seconds
       ~~NOTE (code fix applied): triggerRegeneration() now writes biome JSON to datapack, calls server.reloadResources(), and triggers chunk reload. Features/spawns/colors should now take effect. Terrain SHAPE (noise placement) is export-only — it affects where the biome generates when installed in a real world. Needs re-test.~~
-      NOTE: The chunk regen **looks** like it is being trigger after 3 seconds (chunks disappear and then reappear), but the biome **does not change** at all. All of the features remain the same.
+      ~~NOTE: The chunk regen **looks** like it is being trigger after 3 seconds (chunks disappear and then reappear), but the biome **does not change** at all. All of the features remain the same.~~
+      NOTE (code fix applied): Root cause: server.reloadResources() does NOT reload dynamic registries (biomes/placed_features are frozen at world creation). Fixed by bundling editor_preview.json in mod JAR so it's in the registry from startup. BiomeGenerationMixin + GenerationSettingsAccessor now intercept getGenerationSettings/getSpawnSettings and return live dynamic settings mutated by the editor. triggerRegeneration() calls updateDynamicFeatures/updateDynamicSpawnSettings then teleports player to force chunk reload. Also fixed buildBiomeJson() placing features at wrong step (11 instead of 9). Needs re-test.
 - [x] Rapid slider adjustments reset the timer (no mid-drag regen -- only fires after the 3 s window)
 - [x] `"Refreshing preview..."` HUD indicator appears during regen
       NOTE: TerrainTab renders this when pzm.isRegenerating() is true. Needs re-test.
@@ -90,7 +93,8 @@ Current findings are noted under each task or section header, indicated by `NOTE
 - [x] Clicking it triggers a confirmation prompt before any action
 - [ ] Confirming clears terrain and regenerates using the current parameters
       ~~NOTE (code fix applied): resetWorld() now writes biome JSON to datapack, saves all chunks, deletes .mca files, reloads datapacks, and triggers full chunk regeneration. Needs re-test.~~
-      NOTE: Does not appear to regenerate any new terrain features.
+      ~~NOTE: Does not appear to regenerate any new terrain features.~~
+      NOTE (code fix applied): Same root cause as chunk regen above — biome registry was never updated. resetWorld() now calls updateDynamicFeatures/updateDynamicSpawnSettings, deletes .mca files, and triggers regenerateNearbyChunks(). Needs re-test.
 - [x] Cancelling leaves the world unchanged
 
 ---
@@ -127,19 +131,23 @@ This may be why the biome blending is not working - the world NEVER starts out i
 
 - [ ] Biome does not regenerate with updated settings.
       ~~NOTE (code fix applied): triggerRegeneration() and resetWorld() now write biome JSON to datapack and reload server resources. Needs re-test.~~
-      NOTE: This is still not working properly - It appears to trigger a regen, but the same vanilla features appear except for the Visual setting. 
+      ~~NOTE: This is still not working properly - It appears to trigger a regen, but the same vanilla features appear except for the Visual setting.~~
+      NOTE (code fix applied): See "Changing a Terrain slider" note above — same fix applies. Dynamic registry mutation via mixin. Needs re-test.
 - [x] Biome ID no longer updating - only displays vanilla biomes
       NOTE (code fix applied): Fixed fromSampleJson() to not set biomeIdOverridden. ID auto-derives from display name. Needs re-test.
 - [ ] 'Entities' field shows an example entity, but I would like to be able to select from a list of available entities
       ~~NOTE (code fix applied): Added searchable suggestion dropdown filtered from ENTITY_TYPE registry. Shows up to 6 matches as user types. Needs re-test.~~
-      NOTE: This now displays a short list, but I cannot scroll through it. If i use the down arrow to scroll through the list, it move down to the Export tab. If I use the Tab key to autocomplete, it scrolls to the Export Tab. This list should be scrollable with a mousewheel or arrow keys. Tab should autocomplete.
-      NOTE (code fix applied): Added keyboard navigation (Up/Down arrows, Tab/Enter to autocomplete, Escape to dismiss). Tab keyPressed() now delegates to active tab before tab navigation. Needs re-test.
+      ~~NOTE: This now displays a short list, but I cannot scroll through it. If i use the down arrow to scroll through the list, it move down to the Export tab. If I use the Tab key to autocomplete, it scrolls to the Export Tab. This list should be scrollable with a mousewheel or arrow keys. Tab should autocomplete.~~
+      ~~NOTE (code fix applied): Added keyboard navigation (Up/Down arrows, Tab/Enter to autocomplete, Escape to dismiss). Tab keyPressed() now delegates to active tab before tab navigation. Needs re-test.~~
+      ~~NOTE: Arrow and Tab keys now work as desired in these fields, however the menu is locked on the 6 initial values that are displayed. I cannot scroll or arrow-down/up to values that are not on this initial list. Would it be easier to have a separate pane (to the right of the window) that the list populates inside of? There could be search bar, and maybe even a preview rendering of the selection (someday).~~
+      NOTE (code fix applied): Suggestion pool increased from 6 to 20 results. Dropdown shows 8 at a time with a scroll window that follows keyboard navigation (arrow keys scroll the visible window). Blue border at bottom indicates more results below. Needs re-test.
 - [x] In the Spawns tab, it shows a table with the headings "Entity, Wt, Min, Max". It is currently displaying to close to the Entity: <field> directly above it, so there is some minor overlap.
       NOTE (code fix applied): Increased vertical spacing between entity field and table headers. Needs re-test.
 - [ ] 'Features' field shows example feature, but I would like to be able to select from a list of availabe features.
       ~~NOTE (code fix applied): Added searchable suggestion dropdown filtered from PLACED_FEATURE dynamic registry. Shows up to 6 matches as user types. Needs re-test.~~
-      NOTE: See example about the Entities field in the Spawns Tab. The features field still does not display a list at all. When it is fixed, I would like the same specs as for the Entities field.
-      NOTE (code fix applied): Fixed PLACED_FEATURE lookup to use server registry (works in singleplayer). Added keyboard navigation matching SpawnsTab. Needs re-test.
+      ~~NOTE: See example about the Entities field in the Spawns Tab. The features field still does not display a list at all. When it is fixed, I would like the same specs as for the Entities field.~~
+      ~~NOTE (code fix applied): Fixed PLACED_FEATURE lookup to use server registry (works in singleplayer). Added keyboard navigation matching SpawnsTab. Needs re-test.~~
+      NOTE (code fix applied): Same fix as Entities field above — pool 20, visible 8, scroll window. Needs re-test.
 - [x] In Terrain tab, the bottom text for "Current Biome: " displays to close to the buttons, so the top of the text is covered by the buttons.
       NOTE (code fix applied): Moved status text below all buttons with proper spacing. Needs re-test.
 
