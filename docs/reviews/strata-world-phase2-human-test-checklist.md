@@ -75,8 +75,8 @@ _Check off each item in-game before closing the phase._
 
 ## Draft Persistence
 
-- [ ] Closing and reopening the editor (without quitting) restores the previous values
-- [ ] Quitting to main menu and reloading the world restores the draft
+- [x] Closing and reopening the editor (without quitting) restores the previous values
+- [x] Quitting to main menu and reloading the world restores the draft
 - [ ] Unexported-change indicator is visible in the header when the draft differs from last export
       (indicator disappears after a successful export)
 - [ ] Draft file is written to `saves/<world>/strata_biomes/<name>.draft.json`
