@@ -43,6 +43,9 @@ public class BiomeEditorState {
     /** Whether the biome ID has been manually overridden. */
     private boolean biomeIdOverridden = false;
 
+    /** The source biome used as a template (e.g. "minecraft:plains"), or empty. */
+    private String templateSource = "";
+
     // --- Layer 1: Visual Properties (instant, no chunk regen) ---
 
     private int skyColor = 7972607;
@@ -106,6 +109,7 @@ public class BiomeEditorState {
         copy.displayName = this.displayName;
         copy.biomeId = this.biomeId;
         copy.biomeIdOverridden = this.biomeIdOverridden;
+        copy.templateSource = this.templateSource;
         copy.skyColor = this.skyColor;
         copy.fogColor = this.fogColor;
         copy.waterColor = this.waterColor;
@@ -141,6 +145,7 @@ public class BiomeEditorState {
         this.displayName = snapshot.displayName;
         this.biomeId = snapshot.biomeId;
         this.biomeIdOverridden = snapshot.biomeIdOverridden;
+        this.templateSource = snapshot.templateSource;
         this.skyColor = snapshot.skyColor;
         this.fogColor = snapshot.fogColor;
         this.waterColor = snapshot.waterColor;
@@ -208,6 +213,9 @@ public class BiomeEditorState {
                 .replaceAll("[^a-z0-9_]", "");
         return "strata_world:" + path;
     }
+
+    /** Returns the template source biome ID, or empty string if none. */
+    public String getTemplateSource() { return templateSource; }
 
     // --- Layer 1 Accessors ---
 
@@ -381,10 +389,14 @@ public class BiomeEditorState {
             JsonObject obj = GSON.fromJson(json, JsonObject.class);
             BiomeEditorState state = new BiomeEditorState();
 
-            if (obj.has("displayName")) state.displayName = obj.get("displayName").getAsString();
-            if (obj.has("biomeId")) {
-                state.biomeId = obj.get("biomeId").getAsString();
-                state.biomeIdOverridden = true;
+            if (obj.has("displayName")) {
+                state.displayName = obj.get("displayName").getAsString();
+                state.biomeId = deriveId(state.displayName);
+            }
+            if (obj.has("templateSource")) {
+                state.templateSource = obj.get("templateSource").getAsString();
+            } else if (obj.has("biomeId")) {
+                state.templateSource = obj.get("biomeId").getAsString();
             }
 
             // Layer 1

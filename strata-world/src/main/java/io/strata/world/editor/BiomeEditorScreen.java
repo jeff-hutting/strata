@@ -183,6 +183,13 @@ public class BiomeEditorScreen extends Screen {
         String biomeId = state.getBiomeId().isEmpty() ? "strata_world:untitled" : state.getBiomeId();
         context.drawText(textRenderer, biomeId, TAB_SIDEBAR_WIDTH + 8, 26, 0xFFAAAAAA, false);
 
+        // Show template source if present (e.g. "Loaded template: minecraft:plains")
+        String tmpl = state.getTemplateSource();
+        if (tmpl != null && !tmpl.isEmpty()) {
+            context.drawText(textRenderer, "Loaded template: " + tmpl,
+                    TAB_SIDEBAR_WIDTH + 200, 26, 0xFF66AAFF, false);
+        }
+
         // Unsaved/unexported indicator on the right side of the header
         if (!state.isExported() && state.isDirty()) {
             context.drawText(textRenderer, "\u25CF Unsaved", width - 70, 10, 0xFFFFAA00, false);

@@ -361,6 +361,12 @@ public class ExportTab extends EditorTab {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         var tr = MinecraftClient.getInstance().textRenderer;
 
+        // Sync name field with current state (may have been changed in the header)
+        if (nameField != null && !nameField.isFocused()
+                && !nameField.getText().equals(state.getDisplayName())) {
+            nameField.setText(state.getDisplayName());
+        }
+
         // Section header
         context.drawText(tr, "Export & Save", x + 10, y + 10, 0xFFFFFFFF, true);
 
