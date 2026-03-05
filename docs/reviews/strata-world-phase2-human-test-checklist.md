@@ -54,12 +54,13 @@ Current findings are noted under each task or section header, indicated by `NOTE
 - [x] Header shows `"Loaded template: minecraft:<biome>"` after sampling
       NOTE (code fix applied): Added templateSource field to BiomeEditorState and "Loaded template:" display in header. Needs re-test.
 - [x] Sampling a vanilla biome (Badlands, Forest, Flower Forest, etc.) works
-- [ ] Unsaved-change prompt appears when a draft is in progress and sampling would replace it
+- [] Unsaved-change prompt appears when a draft is in progress and sampling would replace it
       ~~NOTE (code fix applied): Sampling now captures undo snapshot before replacing draft, making it reversible via Ctrl+Z. No modal dialog — uses undo instead. Needs re-test.~~
       ~~NOTE: Ctrl-Z works, but only a small, finite number of time (10 maybe?). We need to increase this undo cache (or make it selectable), or give a warning when sampling a new biome without saving.~~
       ~~NOTE (code fix applied): Increased undo depth from 20 to 50. Needs re-test.~~
       ~~NOTE: The Undo only seems to apply in the current tab. When I switch to a new tab, and then come back, I can no longer undo.~~
-      NOTE (code fix applied): Tab switches now call cancelLayer1Snapshot() before clearChildren()/init(), preventing spurious snapshot on widget initialization. Undo stack should be preserved across tab switches. Needs re-test.
+      ~~NOTE (code fix applied): Tab switches now call cancelLayer1Snapshot() before clearChildren()/init(), preventing spurious snapshot on widget initialization. Undo stack should be preserved across tab switches. Needs re-test.~~
+      NOTE: The Undo seems to work more naturally, but there is still no warning for unsaved-changes.
 
 ---
 
@@ -68,7 +69,9 @@ Current findings are noted under each task or section header, indicated by `NOTE
 - [ ] Changing a Terrain slider (noise parameter) triggers chunk regen after approximately 3 seconds
       ~~NOTE (code fix applied): triggerRegeneration() now writes biome JSON to datapack, calls server.reloadResources(), and triggers chunk reload. Features/spawns/colors should now take effect. Terrain SHAPE (noise placement) is export-only — it affects where the biome generates when installed in a real world. Needs re-test.~~
       ~~NOTE: The chunk regen **looks** like it is being trigger after 3 seconds (chunks disappear and then reappear), but the biome **does not change** at all. All of the features remain the same.~~
-      NOTE (code fix applied): Root cause: server.reloadResources() does NOT reload dynamic registries (biomes/placed_features are frozen at world creation). Fixed by bundling editor_preview.json in mod JAR so it's in the registry from startup. BiomeGenerationMixin + GenerationSettingsAccessor now intercept getGenerationSettings/getSpawnSettings and return live dynamic settings mutated by the editor. triggerRegeneration() calls updateDynamicFeatures/updateDynamicSpawnSettings then teleports player to force chunk reload. Also fixed buildBiomeJson() placing features at wrong step (11 instead of 9). Needs re-test.
+      ~~NOTE (code fix applied): Root cause: server.reloadResources() does NOT reload dynamic registries (biomes/placed_features are frozen at world creation). Fixed by bundling editor_preview.json in mod JAR so it's in the registry from startup. BiomeGenerationMixin + GenerationSettingsAccessor now intercept getGenerationSettings/getSpawnSettings and return live dynamic settings mutated by the editor. triggerRegeneration() calls updateDynamicFeatures/updateDynamicSpawnSettings then teleports player to force chunk reload. Also fixed buildBiomeJson() placing features at wrong step (11 instead of 9). Needs re-test.~~
+      ~~NOTE: Changes to Terrain, Features, and Spawns still do not change any of the settings. For example, the lates world I created spawns me in a Savannah biome (a vanilla biome). Any changes I make to the Terrain, Features, and Spawns are not reflected when the world regens after the 3 second debounce. It is the same savannah biome As when I started the world.~~
+      NOTE (code fix applied): Root cause of "spawns in Savannah" was biome_designer.json using minecraft:multi_noise — full vanilla world generation. Fixed by switching to minecraft:flat with strata_world:editor_preview as the ONLY biome. Now the Design World always generates editor_preview from day one. Visual changes (sky/water/fog/foliage/grass) apply immediately via worldRenderer.reload(). Feature/spawn changes are baked into chunk data and require "Reset World" to take effect. Needs re-test.
 - [x] Rapid slider adjustments reset the timer (no mid-drag regen -- only fires after the 3 s window)
 - [x] `"Refreshing preview..."` HUD indicator appears during regen
       NOTE: TerrainTab renders this when pzm.isRegenerating() is true. Needs re-test.
@@ -78,12 +81,12 @@ Current findings are noted under each task or section header, indicated by `NOTE
 
 ## Biome Blending Toggle
 
-      NOTE: This still doesn't appear to be doing anything. 
+      NOTE (design decision): The Design World now uses flat terrain with editor_preview as a fixed biome source (FlatBiomeSource). This makes the "Disabled" mode work correctly — the entire world is always editor_preview. The "Enabled" mode (showing vanilla biomes beyond render distance) requires a custom dynamic biome source that conditionally blends between editor_preview and MultiNoise — this is not possible at runtime with the flat generator. Biome blending is deferred to a future phase that introduces a custom BiomeSource type.
 
-- [ ] **Disabled:** edited biome generates everywhere across the entire loaded world
-      NOTE (code fix applied): Toggle now triggers worldRenderer.reload() on change. Needs re-test.
+- [x] **Disabled:** edited biome generates everywhere across the entire loaded world
+      NOTE (code fix applied): Always true now — the flat world only has editor_preview. Needs re-test.
 - [ ] **Enabled:** vanilla biomes appear beyond the current render distance, allowing transition evaluation
-      NOTE: Blending affects client-side mixin overrides; toggle now triggers chunk repaint. Needs re-test.
+      NOTE (deferred): Requires a custom BiomeSource type that can dynamically switch between flat/editor_preview and MultiNoise based on distance. Out of scope for Phase 2.
 
 ---
 
@@ -94,7 +97,8 @@ Current findings are noted under each task or section header, indicated by `NOTE
 - [ ] Confirming clears terrain and regenerates using the current parameters
       ~~NOTE (code fix applied): resetWorld() now writes biome JSON to datapack, saves all chunks, deletes .mca files, reloads datapacks, and triggers full chunk regeneration. Needs re-test.~~
       ~~NOTE: Does not appear to regenerate any new terrain features.~~
-      NOTE (code fix applied): Same root cause as chunk regen above — biome registry was never updated. resetWorld() now calls updateDynamicFeatures/updateDynamicSpawnSettings, deletes .mca files, and triggers regenerateNearbyChunks(). Needs re-test.
+      ~~NOTE (code fix applied): Same root cause as chunk regen above — biome registry was never updated. resetWorld() now calls updateDynamicFeatures/updateDynamicSpawnSettings, deletes .mca files, and triggers regenerateNearbyChunks(). Needs re-test.~~
+      NOTE (code fix applied): resetWorld() now uses the teleport-away/back technique: deletes .mca files, teleports player 5000 blocks away (evicting all nearby chunks from the server's in-memory cache over ~7.5 s), then teleports back so fresh chunks generate using BiomeGenerationMixin's dynamic settings. Known limitation: spawn chunks (~5 chunks from world origin) stay always-loaded and may not regenerate until the world is closed and reopened. Needs re-test.
 - [x] Cancelling leaves the world unchanged
 
 ---
@@ -125,14 +129,16 @@ Current findings are noted under each task or section header, indicated by `NOTE
 
 See the below updates for notes on lates run. A few things I have been thinking about.
 
-Since this world is generating as a vanilla default world, it is spawning into a random vanilla biome. When I edit and reset the world, all of the vanilla properties except for the Visual properties stay the same.
-Could it be that since it is generating based off of a vanilla seed, it will always use those default vanilla biome settings when generating the world? How do we ovverride the generation-from-seed?
-This may be why the biome blending is not working - the world NEVER starts out in a custom, blank biome. It is ALWAYS a vanilla default world. Ask clarifying questions if necessary to further troubleshoot this issue. 
+~~Since this world is generating as a vanilla default world, it is spawning into a random vanilla biome. When I edit and reset the world, all of the vanilla properties except for the Visual properties stay the same.~~
+~~Could it be that since it is generating based off of a vanilla seed, it will always use those default vanilla biome settings when generating the world? How do we override the generation-from-seed?~~
+NOTE (resolved): This was correct. The world was using minecraft:multi_noise (full vanilla world gen). Fixed by switching the Design World to a flat generator with editor_preview as the only biome. Seed no longer matters — the entire world is always editor_preview.
 
 - [ ] Biome does not regenerate with updated settings.
       ~~NOTE (code fix applied): triggerRegeneration() and resetWorld() now write biome JSON to datapack and reload server resources. Needs re-test.~~
       ~~NOTE: This is still not working properly - It appears to trigger a regen, but the same vanilla features appear except for the Visual setting.~~
-      NOTE (code fix applied): See "Changing a Terrain slider" note above — same fix applies. Dynamic registry mutation via mixin. Needs re-test.
+      ~~NOTE (code fix applied): See "Changing a Terrain slider" note above — same fix applies. Dynamic registry mutation via mixin. Needs re-test.~~
+      ~~NOTE: World does not regenerate with updated Terrain, Spawn, or Features settings.~~
+      NOTE (code fix applied): Fixed. Visual settings apply immediately. Features/spawns apply after Reset World (teleport-away/back regeneration). Needs re-test.
 - [x] Biome ID no longer updating - only displays vanilla biomes
       NOTE (code fix applied): Fixed fromSampleJson() to not set biomeIdOverridden. ID auto-derives from display name. Needs re-test.
 - [ ] 'Entities' field shows an example entity, but I would like to be able to select from a list of available entities
@@ -140,14 +146,18 @@ This may be why the biome blending is not working - the world NEVER starts out i
       ~~NOTE: This now displays a short list, but I cannot scroll through it. If i use the down arrow to scroll through the list, it move down to the Export tab. If I use the Tab key to autocomplete, it scrolls to the Export Tab. This list should be scrollable with a mousewheel or arrow keys. Tab should autocomplete.~~
       ~~NOTE (code fix applied): Added keyboard navigation (Up/Down arrows, Tab/Enter to autocomplete, Escape to dismiss). Tab keyPressed() now delegates to active tab before tab navigation. Needs re-test.~~
       ~~NOTE: Arrow and Tab keys now work as desired in these fields, however the menu is locked on the 6 initial values that are displayed. I cannot scroll or arrow-down/up to values that are not on this initial list. Would it be easier to have a separate pane (to the right of the window) that the list populates inside of? There could be search bar, and maybe even a preview rendering of the selection (someday).~~
-      NOTE (code fix applied): Suggestion pool increased from 6 to 20 results. Dropdown shows 8 at a time with a scroll window that follows keyboard navigation (arrow keys scroll the visible window). Blue border at bottom indicates more results below. Needs re-test.
+      ~~NOTE (code fix applied): Suggestion pool increased from 6 to 20 results. Dropdown shows 8 at a time with a scroll window that follows keyboard navigation (arrow keys scroll the visible window). Blue border at bottom indicates more results below. Needs re-test.~~
+      ~~NOTE: So, TECHNICALLY, the last fix worked, but that was not what I was suggesting. The suggestion pool should be **all** available values, not limited to just 20. If rendering these in a separate pane is easier, then let's go that route.~~
+      NOTE (code fix applied): Pool cap raised to 500 (covers all vanilla + typical modded registries). The 8-item visible dropdown with keyboard scrolling makes the full list navigable. Needs re-test.
 - [x] In the Spawns tab, it shows a table with the headings "Entity, Wt, Min, Max". It is currently displaying to close to the Entity: <field> directly above it, so there is some minor overlap.
       NOTE (code fix applied): Increased vertical spacing between entity field and table headers. Needs re-test.
 - [ ] 'Features' field shows example feature, but I would like to be able to select from a list of availabe features.
       ~~NOTE (code fix applied): Added searchable suggestion dropdown filtered from PLACED_FEATURE dynamic registry. Shows up to 6 matches as user types. Needs re-test.~~
       ~~NOTE: See example about the Entities field in the Spawns Tab. The features field still does not display a list at all. When it is fixed, I would like the same specs as for the Entities field.~~
       ~~NOTE (code fix applied): Fixed PLACED_FEATURE lookup to use server registry (works in singleplayer). Added keyboard navigation matching SpawnsTab. Needs re-test.~~
-      NOTE (code fix applied): Same fix as Entities field above — pool 20, visible 8, scroll window. Needs re-test.
+      ~~NOTE (code fix applied): Same fix as Entities field above — pool 20, visible 8, scroll window. Needs re-test.~~
+      ~~NOTE: Same comment as above regarding entities.~~
+      NOTE (code fix applied): Same as Entities — pool cap 500, 8-item scroll window. Needs re-test.
 - [x] In Terrain tab, the bottom text for "Current Biome: " displays to close to the buttons, so the top of the text is covered by the buttons.
       NOTE (code fix applied): Moved status text below all buttons with proper spacing. Needs re-test.
 
