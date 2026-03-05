@@ -438,6 +438,65 @@ public class BiomeEditorState {
     }
 
     /**
+     * Builds a vanilla-compatible biome JSON string from the current state.
+     * Used by Export tab and preview zone regen.
+     */
+    public String buildBiomeJson() {
+        JsonObject root = new JsonObject();
+        root.addProperty("has_precipitation", hasRain || hasSnow);
+        root.addProperty("temperature", Math.round(temperature * 1000f) / 1000f);
+        root.addProperty("downfall", Math.round(humidity * 1000f) / 1000f);
+
+        JsonObject effects = new JsonObject();
+        effects.addProperty("sky_color", skyColor);
+        effects.addProperty("fog_color", fogColor);
+        effects.addProperty("water_color", waterColor);
+        effects.addProperty("water_fog_color", waterFogColor);
+        if (grassColor >= 0) effects.addProperty("grass_color", grassColor);
+        if (foliageColor >= 0) effects.addProperty("foliage_color", foliageColor);
+
+        JsonObject moodSound = new JsonObject();
+        moodSound.addProperty("sound", "minecraft:ambient.cave");
+        moodSound.addProperty("tick_delay", 6000);
+        moodSound.addProperty("block_search_extent", 8);
+        moodSound.addProperty("offset", 2.0);
+        effects.add("mood_sound", moodSound);
+        root.add("effects", effects);
+
+        // Features — all in generation step 10 (vegetal_decoration)
+        JsonArray featureSteps = new JsonArray();
+        for (int i = 0; i < 11; i++) featureSteps.add(new JsonArray());
+        JsonArray vegetalStep = new JsonArray();
+        for (String feature : features) vegetalStep.add(feature);
+        featureSteps.add(vegetalStep);
+        featureSteps.add(new JsonArray()); // step 11
+        root.add("features", featureSteps);
+
+        // Spawners
+        JsonObject spawners = new JsonObject();
+        JsonArray creatureSpawns = new JsonArray();
+        for (SpawnEntry entry : spawnEntries) {
+            JsonObject spawn = new JsonObject();
+            spawn.addProperty("type", entry.getEntityId());
+            spawn.addProperty("weight", entry.getWeight());
+            spawn.addProperty("minCount", entry.getMinGroupSize());
+            spawn.addProperty("maxCount", entry.getMaxGroupSize());
+            creatureSpawns.add(spawn);
+        }
+        spawners.add("creature", creatureSpawns);
+        spawners.add("monster", new JsonArray());
+        spawners.add("ambient", new JsonArray());
+        spawners.add("underground_water_creature", new JsonArray());
+        spawners.add("water_creature", new JsonArray());
+        spawners.add("water_ambient", new JsonArray());
+        spawners.add("misc", new JsonArray());
+        root.add("spawners", spawners);
+        root.add("spawn_costs", new JsonObject());
+
+        return GSON.toJson(root);
+    }
+
+    /**
      * Saves this state as a draft file at the given path.
      * Path format: {@code saves/<world>/strata_biomes/<name>.draft.json}
      *

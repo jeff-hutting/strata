@@ -2,12 +2,10 @@ package io.strata.world.editor.tabs;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.strata.core.util.StrataLogger;
 import io.strata.world.editor.BiomeEditorScreen;
 import io.strata.world.editor.BiomeEditorState;
-import io.strata.world.editor.BiomeEditorState.SpawnEntry;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -117,78 +115,10 @@ public class ExportTab extends EditorTab {
 
     /**
      * Builds the biome JSON string in vanilla datapack format.
-     * Mirrors the structure of {@code verdant_highlands.json}.
+     * Delegates to {@link BiomeEditorState#buildBiomeJson()}.
      */
     private String buildBiomeJson() {
-        JsonObject root = new JsonObject();
-
-        // Precipitation
-        root.addProperty("has_precipitation", state.hasRain() || state.hasSnow());
-
-        // Temperature / downfall (humidity)
-        root.addProperty("temperature", roundTo3(state.getTemperature()));
-        root.addProperty("downfall", roundTo3(state.getHumidity()));
-
-        // Effects block
-        JsonObject effects = new JsonObject();
-        effects.addProperty("sky_color", state.getSkyColor());
-        effects.addProperty("fog_color", state.getFogColor());
-        effects.addProperty("water_color", state.getWaterColor());
-        effects.addProperty("water_fog_color", state.getWaterFogColor());
-        if (state.getGrassColor() >= 0) {
-            effects.addProperty("grass_color", state.getGrassColor());
-        }
-        if (state.getFoliageColor() >= 0) {
-            effects.addProperty("foliage_color", state.getFoliageColor());
-        }
-
-        // Mood sound (standard default)
-        JsonObject moodSound = new JsonObject();
-        moodSound.addProperty("sound", "minecraft:ambient.cave");
-        moodSound.addProperty("tick_delay", 6000);
-        moodSound.addProperty("block_search_extent", 8);
-        moodSound.addProperty("offset", 2.0);
-        effects.add("mood_sound", moodSound);
-
-        root.add("effects", effects);
-
-        // Features — flat list (all features go into generation step 10 = vegetal_decoration)
-        // Vanilla uses 12 indexed steps; we put user features in step 10
-        JsonArray featureSteps = new JsonArray();
-        for (int i = 0; i < 11; i++) {
-            featureSteps.add(new JsonArray()); // empty steps 0-9
-        }
-        JsonArray vegetalStep = new JsonArray();
-        for (String feature : state.getFeatures()) {
-            vegetalStep.add(feature);
-        }
-        featureSteps.add(vegetalStep); // step 10 = vegetal_decoration
-        featureSteps.add(new JsonArray()); // step 11 = top_layer_modification
-        root.add("features", featureSteps);
-
-        // Spawners — all entries go into "creature" category for simplicity
-        JsonObject spawners = new JsonObject();
-        JsonArray creatureSpawns = new JsonArray();
-        for (SpawnEntry entry : state.getSpawnEntries()) {
-            JsonObject spawn = new JsonObject();
-            spawn.addProperty("type", entry.getEntityId());
-            spawn.addProperty("weight", entry.getWeight());
-            spawn.addProperty("minCount", entry.getMinGroupSize());
-            spawn.addProperty("maxCount", entry.getMaxGroupSize());
-            creatureSpawns.add(spawn);
-        }
-        spawners.add("creature", creatureSpawns);
-        spawners.add("monster", new JsonArray());
-        spawners.add("ambient", new JsonArray());
-        spawners.add("underground_water_creature", new JsonArray());
-        spawners.add("water_creature", new JsonArray());
-        spawners.add("water_ambient", new JsonArray());
-        spawners.add("misc", new JsonArray());
-        root.add("spawners", spawners);
-
-        root.add("spawn_costs", new JsonObject());
-
-        return GSON.toJson(root);
+        return state.buildBiomeJson();
     }
 
     /**
