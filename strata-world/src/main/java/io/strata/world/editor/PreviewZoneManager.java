@@ -8,7 +8,6 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.WorldSavePath;
-import net.minecraft.util.math.BlockPos;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -16,15 +15,29 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Manages debounced chunk regeneration for the Biome Editor preview zone.
+ * Manages debounced preview refresh for the Biome Editor.
  *
- * <p>When Layer 2 (structural) parameters change, the preview zone is
- * regenerated after a 3-second debounce window. The debounce timer resets
- * each time a value changes, so regeneration only fires once the player
- * has stopped making changes for a full 3 seconds.
+ * <h3>Design World terrain model</h3>
+ * <p>The Design World uses a flat terrain generator with
+ * {@code strata_world:editor_preview} as its only biome. This means:
+ * <ul>
+ *   <li><b>Visual changes</b> (sky/water/fog/foliage colors, Layer 1) take effect
+ *       immediately via {@code worldRenderer.reload()} — no chunk regeneration needed.
+ *   <li><b>Feature and spawn changes</b> (Layer 2) are registered in dynamic
+ *       in-memory {@link GenerationSettings} / {@link SpawnSettings}, but the physical
+ *       blocks baked into existing chunks cannot be updated in-place. Players must
+ *       use <em>Reset World</em> to delete and regenerate chunk files.
+ * </ul>
  *
- * <p>The preview zone radius dynamically matches the player's current
- * render distance setting. An undo snapshot is captured on each regen.
+ * <h3>Reset World flow</h3>
+ * <ol>
+ *   <li>Dynamic settings updated.
+ *   <li>All overworld region ({@code .mca}) files deleted.
+ *   <li>Player teleported 5 000 blocks away so the server evicts all non-spawn
+ *       chunks from its in-memory cache (takes ≈7 s at 20 Hz).
+ *   <li>Player teleported back; fresh chunks generate using the current dynamic
+ *       generation settings via {@link BiomeGenerationMixin}.
+ * </ol>
  *
  * @see BiomeEditorState
  * @see BiomeEditorState.UndoManager
@@ -40,11 +53,18 @@ public class PreviewZoneManager {
     /** Timestamp of the last Layer 1 change, or -1 if no pending snapshot. */
     private long lastLayer1ChangeTime = -1;
 
-    /** Whether a chunk regeneration is currently in progress. */
+    /** Whether a regen/reset is currently in progress (drives the HUD indicator). */
     private boolean regenerating = false;
 
-    /** Whether biome blending is enabled (vanilla biomes outside render distance). */
+    /** Whether biome blending is enabled (deferred feature — no-op in current flat-world mode). */
     private boolean biomeBlendingEnabled = false;
+
+    // ── Reset World pending-respawn state ────────────────────────────────────
+    /** Client ticks remaining before teleporting the player back after a Reset World. -1 = idle. */
+    private int pendingRespawnCountdown = -1;
+    /** Target position for the respawn-back teleport after a Reset World. */
+    private double pendingRespawnX, pendingRespawnY, pendingRespawnZ;
+    private float pendingRespawnYaw, pendingRespawnPitch;
 
     /**
      * Creates a PreviewZoneManager for the given editor state and undo manager.
@@ -84,7 +104,8 @@ public class PreviewZoneManager {
 
     /**
      * Called every client tick. Checks whether debounce timers have expired
-     * and triggers chunk regeneration or snapshot capture as needed.
+     * and triggers preview refresh or snapshot capture as needed.
+     * Also drives the Reset World pending-respawn countdown.
      * Debounce durations are read from {@link WorldConfig} so they can be
      * tuned without recompilation.
      */
@@ -92,7 +113,7 @@ public class PreviewZoneManager {
         long now = System.currentTimeMillis();
         WorldConfig config = StrataConfigHelper.get(WorldConfig.class);
 
-        // Check Layer 2 debounce — trigger chunk regen
+        // Check Layer 2 debounce — update dynamic settings + visual refresh
         if (lastLayer2ChangeTime > 0 && !regenerating) {
             if (now - lastLayer2ChangeTime >= config.editorLayer2DebounceMs) {
                 lastLayer2ChangeTime = -1;
@@ -102,7 +123,8 @@ public class PreviewZoneManager {
 
         // Clear regenerating indicator after minimum display duration
         if (regenerating && regenStartTime > 0
-                && now - regenStartTime >= REGEN_INDICATOR_MIN_MS) {
+                && now - regenStartTime >= REGEN_INDICATOR_MIN_MS
+                && pendingRespawnCountdown < 0) {
             regenerating = false;
             regenStartTime = -1;
         }
@@ -113,6 +135,35 @@ public class PreviewZoneManager {
                 lastLayer1ChangeTime = -1;
                 undoManager.captureSnapshot(state);
                 StrataLogger.debug("Captured Layer 1 undo snapshot");
+            }
+        }
+
+        // Reset World pending respawn: tick down, then teleport player back
+        if (pendingRespawnCountdown > 0) {
+            pendingRespawnCountdown--;
+        } else if (pendingRespawnCountdown == 0) {
+            pendingRespawnCountdown = -1;
+            MinecraftClient mc = MinecraftClient.getInstance();
+            MinecraftServer server = mc.getServer();
+            if (server != null && mc.player != null) {
+                server.execute(() -> {
+                    var serverPlayer = server.getPlayerManager().getPlayer(mc.player.getUuid());
+                    ServerWorld overworld = server.getOverworld();
+                    if (serverPlayer != null && overworld != null) {
+                        serverPlayer.teleport(overworld,
+                                pendingRespawnX, pendingRespawnY, pendingRespawnZ,
+                                java.util.Set.of(), pendingRespawnYaw, pendingRespawnPitch, true);
+                        StrataLogger.info("Reset World: teleported player back to origin");
+                    }
+                });
+                mc.execute(() -> {
+                    if (mc.worldRenderer != null) mc.worldRenderer.reload();
+                    regenerating = false;
+                    regenStartTime = -1;
+                });
+            } else {
+                regenerating = false;
+                regenStartTime = -1;
             }
         }
     }
@@ -127,37 +178,40 @@ public class PreviewZoneManager {
     private static final long REGEN_INDICATOR_MIN_MS = 1000L;
 
     /**
-     * Triggers chunk regeneration of the preview zone.
-     * Captures an undo snapshot before regeneration.
+     * Fires after the Layer 2 debounce window expires (or via {@link #forceRegeneration()}).
      *
-     * <p>Updates the in-memory dynamic generation settings (features and spawns)
-     * on the editor_preview biome, then forces nearby chunks to regenerate so
-     * the changes are visible in the world. No datapack reload is required because
-     * {@code editor_preview.json} is bundled in the mod JAR and the biome object
-     * is mutated in-memory via the accessor mixin.
+     * <p>Captures an undo snapshot, updates the in-memory dynamic generation
+     * settings so the next Reset World sees the latest values, then reloads the
+     * client-side chunk renderer so visual changes (sky/water/fog/foliage/grass
+     * color) take effect immediately.
+     *
+     * <p>Feature and spawn changes are NOT visible until the player uses
+     * <em>Reset World</em>, because those are physically baked into saved chunk
+     * data and cannot be updated in the existing terrain without regenerating chunks.
      */
     private void triggerRegeneration() {
         undoManager.captureSnapshot(state);
         regenerating = true;
         regenStartTime = System.currentTimeMillis();
 
-        StrataLogger.debug("Starting preview zone regeneration (render distance: {} chunks)",
-                getRenderDistance());
-
         MinecraftClient mc = MinecraftClient.getInstance();
         MinecraftServer server = mc.getServer();
 
         if (server != null) {
             server.execute(() -> {
-                // Ensure override is set (may not be if this is the first regen)
                 initBiomeOverrideIfNeeded(server);
-                // Update in-memory features and spawns on the preview biome
                 ServerWorld overworld = server.getOverworld();
                 if (overworld != null) {
                     BiomeEditorSession.updateDynamicFeatures(overworld, state.getFeatures());
                     BiomeEditorSession.updateDynamicSpawnSettings(state.getSpawnEntries());
                 }
-                regenerateNearbyChunks(server, mc);
+                // Visual refresh only — features/spawns require Reset World
+                mc.execute(() -> {
+                    if (mc.worldRenderer != null) {
+                        mc.worldRenderer.reload();
+                        StrataLogger.debug("Visual refresh: worldRenderer.reload()");
+                    }
+                });
             });
         } else {
             if (mc.worldRenderer != null) {
@@ -176,8 +230,24 @@ public class PreviewZoneManager {
     }
 
     /**
-     * Resets the entire world — updates dynamic settings, clears all region
-     * files, and forces a full chunk regeneration.
+     * Resets the entire world — updates dynamic settings, deletes all region
+     * files, and forces a full chunk regeneration via the teleport-away/back
+     * technique.
+     *
+     * <h3>Why teleport-away?</h3>
+     * <p>Minecraft keeps loaded chunks in an in-memory cache. Deleting {@code .mca}
+     * files alone does not evict already-loaded chunks — the server continues to use
+     * the cached data until the chunks naturally unload. Teleporting the player
+     * ~5 000 blocks away removes their player-load ticket from all nearby chunks,
+     * which causes the server to unload them over ≈150 ticks (~7.5 s). When the
+     * player is then teleported back, the server regenerates those chunks from
+     * scratch using the current dynamic generation settings (injected by
+     * {@link BiomeGenerationMixin}).
+     *
+     * <p><b>Limitation:</b> Spawn chunks (within ~5 chunks of the world spawn
+     * point, typically near the origin) are kept loaded by the server regardless
+     * of player position. After a reset, these chunks may not be regenerated until
+     * the world is closed and reopened.
      */
     public void resetWorld() {
         StrataLogger.info("Resetting Design World — clearing chunks, regenerating");
@@ -214,7 +284,34 @@ public class PreviewZoneManager {
                 }
             }
 
-            regenerateNearbyChunks(server, mc);
+            // Teleport the player far away to force in-memory chunk eviction
+            var serverPlayer = mc.player != null
+                    ? server.getPlayerManager().getPlayer(mc.player.getUuid()) : null;
+            if (serverPlayer != null && overworld != null) {
+                // Store the original position for the teleport-back
+                pendingRespawnX = serverPlayer.getX();
+                pendingRespawnY = serverPlayer.getY();
+                pendingRespawnZ = serverPlayer.getZ();
+                pendingRespawnYaw = serverPlayer.getYaw();
+                pendingRespawnPitch = serverPlayer.getPitch();
+
+                // Teleport far away — removes player-load ticket from all nearby chunks
+                serverPlayer.teleport(overworld,
+                        5000.5, serverPlayer.getY(), 0.5,
+                        java.util.Set.of(), 0f, 0f, true);
+                StrataLogger.info("Reset World: teleported player to staging area; " +
+                        "waiting for chunk eviction (~150 ticks)");
+
+                // Schedule the teleport-back after 150 client ticks (~7.5 s)
+                mc.execute(() -> pendingRespawnCountdown = 150);
+            } else {
+                // No player in world — just reload renderer
+                mc.execute(() -> {
+                    if (mc.worldRenderer != null) mc.worldRenderer.reload();
+                    regenerating = false;
+                    regenStartTime = -1;
+                });
+            }
         });
     }
 
@@ -276,30 +373,4 @@ public class PreviewZoneManager {
                 });
     }
 
-    /**
-     * Teleports the player in-place (to force the server to unload and regenerate
-     * nearby chunks) then reloads client-side chunk rendering.
-     * Must be called on the server thread.
-     */
-    private void regenerateNearbyChunks(MinecraftServer server, MinecraftClient mc) {
-        if (mc.player != null) {
-            ServerWorld overworld = server.getOverworld();
-            if (overworld != null) {
-                var serverPlayer = server.getPlayerManager().getPlayer(mc.player.getUuid());
-                if (serverPlayer != null) {
-                    BlockPos pos = serverPlayer.getBlockPos();
-                    serverPlayer.teleport(overworld,
-                            pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5,
-                            java.util.Set.of(), serverPlayer.getYaw(),
-                            serverPlayer.getPitch(), true);
-                }
-            }
-        }
-        mc.execute(() -> {
-            if (mc.worldRenderer != null) {
-                mc.worldRenderer.reload();
-                StrataLogger.debug("Triggered worldRenderer.reload() after chunk regen");
-            }
-        });
-    }
 }

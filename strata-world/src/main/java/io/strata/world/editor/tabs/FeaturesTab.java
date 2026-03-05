@@ -46,8 +46,8 @@ public class FeaturesTab extends EditorTab {
     private List<String> suggestions = List.of();
     private int selectedSuggestion = -1;
     private int suggestionScrollOffset = 0;
-    /** Maximum number of suggestions fetched from the registry. */
-    private static final int MAX_SUGGESTIONS = 20;
+    /** Hard cap on suggestions fetched, to prevent UI hangs with very large modded registries. */
+    private static final int MAX_SUGGESTIONS = 500;
     /** Maximum number of suggestions visible in the dropdown at once. */
     private static final int MAX_VISIBLE_SUGGESTIONS = 8;
     private static final int SUGGESTION_HEIGHT = 12;

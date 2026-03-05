@@ -3,12 +3,17 @@
     "minecraft:overworld": {
       "type": "minecraft:overworld",
       "generator": {
-        "type": "minecraft:noise",
-        "biome_source": {
-          "type": "minecraft:multi_noise",
-          "preset": "minecraft:overworld"
-        },
-        "settings": "minecraft:overworld"
+        "type": "minecraft:flat",
+        "settings": {
+          "layers": [
+            {"height": 1, "block": "minecraft:bedrock"},
+            {"height": 2, "block": "minecraft:dirt"},
+            {"height": 1, "block": "minecraft:grass_block"}
+          ],
+          "biome": "strata_world:editor_preview",
+          "features": true,
+          "lakes": false
+        }
       }
     },
     "minecraft:the_nether": {
