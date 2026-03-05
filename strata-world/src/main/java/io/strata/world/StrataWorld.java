@@ -66,11 +66,18 @@ public class StrataWorld implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTING.register(BiomeDesignWorldPreset::cacheWorldType);
 
         // Issue #1 — Singleplayer enforcement: kick non-host players in a Biome Design World.
-        // Biome Design Worlds are singleplayer-only per SPEC §7.0. Only the first connected
-        // player (the host) is permitted; any additional join attempt is rejected.
+        // Biome Design Worlds are singleplayer-only per SPEC §7.0. Only the host player
+        // is permitted; any other join attempt (e.g. via Open to LAN) is rejected.
+        // We track the host's UUID and reject any other player.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             if (!BiomeDesignWorldPreset.isCurrentWorldBiomeDesignWorld(server)) return;
-            if (server.getCurrentPlayerCount() > 1) {
+            // In an integrated server (singleplayer/LAN), the host is the first player.
+            // If the server is singleplayer-only, reject any non-first player.
+            var joiningPlayer = handler.getPlayer();
+            boolean isHost = server.isSingleplayer()
+                    && server.getHostProfile() != null
+                    && server.getHostProfile().id().equals(joiningPlayer.getUuid());
+            if (!isHost) {
                 handler.disconnect(
                         Text.translatable("disconnect.strata_world.biome_design_singleplayer"));
             }
@@ -87,6 +94,31 @@ public class StrataWorld implements ModInitializer {
                 player.sendMessage(
                         Text.translatable("message.strata_world.welcome"),
                         false);
+            }
+        });
+
+        // Issue #3 — Re-give Strata Wand on respawn in a Biome Design World.
+        // The wand is not craftable or searchable in creative inventory, so dying
+        // loses it permanently unless we re-give it on respawn.
+        StrataEvents.PLAYER_RESPAWN.register(player -> {
+            var server = player.getEntityWorld().getServer();
+            if (BiomeDesignWorldPreset.isCurrentWorldBiomeDesignWorld(server)) {
+                // Only give if the player doesn't already have one
+                boolean hasWand = false;
+                for (int i = 0; i < player.getInventory().size(); i++) {
+                    if (player.getInventory().getStack(i).getItem() instanceof StrataWand) {
+                        hasWand = true;
+                        break;
+                    }
+                }
+                if (!hasWand) {
+                    player.getInventory().setStack(
+                            player.getInventory().getSelectedSlot(),
+                            new ItemStack(StrataWand.INSTANCE));
+                    player.sendMessage(
+                            Text.translatable("message.strata_world.wand_restored"),
+                            true);
+                }
             }
         });
 

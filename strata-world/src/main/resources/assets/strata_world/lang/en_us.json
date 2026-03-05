@@ -4,6 +4,7 @@
   "item.strata_world.strata_wand.tooltip": "Right-click to open the Biome Editor",
   "message.strata_world.welcome": "Welcome to the Strata Biome Designer. Your wand is ready.",
   "message.strata_world.no_handler": "No Strata editor available for this object.",
+  "message.strata_world.wand_restored": "Strata Wand restored.",
   "disconnect.strata_world.biome_design_singleplayer": "Biome Design Worlds are singleplayer only.",
   "screen.strata_world.biome_editor": "Biome Editor",
   "tab.strata_world.visual": "Visual",
