@@ -178,7 +178,7 @@ public class TerrainTab extends EditorTab {
                 int sliderY = y + 28 + i * ROW_STRIDE;
                 NoiseParam param = PARAMS[i];
                 String rangeText = String.format("[%.1f, %.1f]", param.min, param.max);
-                context.drawText(tr, rangeText, x + 14 + sliderW, sliderY + 3, 0xFF666666, false);
+                context.drawText(tr, rangeText, x + 14 + sliderW, sliderY + 3, 0xFF888888, false);
             }
         }
 

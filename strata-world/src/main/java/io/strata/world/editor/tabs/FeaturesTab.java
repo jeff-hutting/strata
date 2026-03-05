@@ -150,7 +150,7 @@ public class FeaturesTab extends EditorTab {
                     scrollOffset + 1,
                     Math.min(scrollOffset + maxRows, features.size()),
                     features.size());
-            context.drawText(tr, scrollText, x + width - 90, y + 10, 0xFF666666, false);
+            context.drawText(tr, scrollText, x + width - 90, y + 10, 0xFF888888, false);
         }
 
         // Feature rows
@@ -171,7 +171,7 @@ public class FeaturesTab extends EditorTab {
 
             // Index number
             context.drawText(tr, (featureIndex + 1) + ".",
-                    x + 10, rowY + 3, 0xFF666666, false);
+                    x + 10, rowY + 3, 0xFF888888, false);
 
             // Feature ID (truncate if too long)
             String featureId = features.get(featureIndex);
@@ -196,9 +196,9 @@ public class FeaturesTab extends EditorTab {
         // Empty state message
         if (features.isEmpty()) {
             context.drawText(tr, "No features added yet.",
-                    x + 10, listY + 4, 0xFF666666, false);
+                    x + 10, listY + 4, 0xFF999999, false);
             context.drawText(tr, "Enter a feature ID above and click Add.",
-                    x + 10, listY + 18, 0xFF555555, false);
+                    x + 10, listY + 18, 0xFF888888, false);
         }
     }
 }

@@ -261,13 +261,16 @@ public class SpawnsTab extends EditorTab {
         // Empty state
         if (entries.isEmpty()) {
             context.drawText(tr, "No spawn entries yet.",
-                    x + 10, listY + 4, 0xFF666666, false);
+                    x + 10, listY + 4, 0xFF999999, false);
             context.drawText(tr, "Enter an entity ID above and click Add.",
-                    x + 10, listY + 18, 0xFF555555, false);
+                    x + 10, listY + 18, 0xFF888888, false);
         }
 
-        // Edit section labels
+        // Visual separator between list and edit section
         int editY = y + height - 60;
+        context.fill(x + 5, editY - 8, x + width - 5, editY - 7, 0x40FFFFFF);
+
+        // Edit section labels
         context.drawText(tr, "Weight:", x + 10, editY + 3, 0xFFAAAAAA, false);
         context.drawText(tr, "Min:", x + 120, editY + 3, 0xFFAAAAAA, false);
         context.drawText(tr, "Max:", x + 192, editY + 3, 0xFFAAAAAA, false);
@@ -275,9 +278,9 @@ public class SpawnsTab extends EditorTab {
         // Selected entry indicator
         if (selectedIndex >= 0 && selectedIndex < entries.size()) {
             String selLabel = "Editing: " + entries.get(selectedIndex).getEntityId();
-            context.drawText(tr, selLabel, x + 10, editY - 14, 0xFF4A90D9, false);
+            context.drawText(tr, selLabel, x + 10, editY - 20, 0xFF4A90D9, false);
         } else {
-            context.drawText(tr, "Click a row to edit", x + 10, editY - 14, 0xFF555555, false);
+            context.drawText(tr, "Click a row to edit", x + 10, editY - 20, 0xFF888888, false);
         }
     }
 }

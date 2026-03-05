@@ -104,14 +104,18 @@ public class PreviewZoneManager {
         StrataLogger.debug("Starting preview zone regeneration (render distance: {} chunks)",
                 getRenderDistance());
 
-        // TODO: Implement actual chunk regeneration
-        // 1. Get player position
-        // 2. Calculate chunk range based on render distance
-        // 3. For each chunk in range, regenerate using current biome parameters
-        // 4. Show HUD indicator "Refreshing preview..."
-        // 5. Set regenerating = false when complete
+        // Reload all rendered chunks so that biome color overrides (grass, foliage, water)
+        // applied by our mixins are rebaked into the chunk display.
+        // NOTE: This does not change *which* vanilla biome is sampled at each world position —
+        // true structural biome reassignment requires server-side regeneration and is a
+        // future milestone. For now, this ensures color changes are always reflected.
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.worldRenderer != null) {
+            mc.worldRenderer.reload();
+            StrataLogger.debug("Triggered worldRenderer.reload() for preview refresh");
+        }
 
-        regenerating = false; // Placeholder — will be async in full implementation
+        regenerating = false;
     }
 
     /**

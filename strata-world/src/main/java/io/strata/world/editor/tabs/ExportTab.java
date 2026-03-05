@@ -281,7 +281,7 @@ public class ExportTab extends EditorTab {
 
         // Current biome ID display
         String biomeId = state.getBiomeId().isEmpty() ? "strata_world:untitled" : state.getBiomeId();
-        context.drawText(tr, "ID: " + biomeId, x + 10, y + 70, 0xFF666666, false);
+        context.drawText(tr, "ID: " + biomeId, x + 10, y + 70, 0xFF888888, false);
 
         // Export status indicator
         if (state.isExported()) {
@@ -305,11 +305,11 @@ public class ExportTab extends EditorTab {
         for (int i = 0; i < maxPreviewLines; i++) {
             String line = lines[i];
             if (line.length() > 50) line = line.substring(0, 47) + "...";
-            context.drawText(tr, line, x + 10, previewY + 14 + i * 10, 0xFF555555, false);
+            context.drawText(tr, line, x + 10, previewY + 14 + i * 10, 0xFF777777, false);
         }
         if (lines.length > maxPreviewLines) {
             context.drawText(tr, "... (" + lines.length + " lines total)",
-                    x + 10, previewY + 14 + maxPreviewLines * 10, 0xFF444444, false);
+                    x + 10, previewY + 14 + maxPreviewLines * 10, 0xFF666666, false);
         }
     }
 }
