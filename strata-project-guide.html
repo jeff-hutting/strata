@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strata Project Guide — Directory & File Breakdown</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --border: #2d3140;
+    --text: #e2e4eb;
+    --text-dim: #8b8fa3;
+    --accent: #7c6ef0;
+    --accent-dim: #5a4fd4;
+    --green: #4ade80;
+    --green-dim: #22543d;
+    --blue: #60a5fa;
+    --blue-dim: #1e3a5f;
+    --orange: #fb923c;
+    --orange-dim: #4a2c0a;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --pink: #f472b6;
+    --cyan: #22d3ee;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+  }
+
+  .hero {
+    background: linear-gradient(135deg, #1a1040 0%, #0f1117 60%, #0a1628 100%);
+    padding: 60px 40px 50px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  .hero h1 {
+    font-size: 2.4em;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+  }
+  .hero .subtitle {
+    color: var(--text-dim);
+    font-size: 1.15em;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 30px;
+  }
+
+  /* Table of contents */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 48px;
+  }
+  .toc h2 {
+    font-size: 1.2em;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .toc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 32px;
+  }
+  .toc a {
+    color: var(--blue);
+    text-decoration: none;
+    font-size: 0.95em;
+    padding: 4px 0;
+    display: block;
+    transition: color 0.15s;
+  }
+  .toc a:hover { color: var(--cyan); }
+
+  /* Section headers */
+  .section-header {
+    margin-top: 56px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--accent-dim);
+  }
+  .section-header h2 {
+    font-size: 1.6em;
+    color: var(--accent);
+  }
+  .section-header p {
+    color: var(--text-dim);
+    margin-top: 6px;
+    font-size: 0.95em;
+  }
+
+  /* Concept boxes */
+  .concept {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin-bottom: 24px;
+  }
+  .concept h3 {
+    color: var(--yellow);
+    font-size: 1em;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .concept p { color: var(--text); font-size: 0.95em; }
+
+  /* File cards */
+  .file-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    transition: border-color 0.2s;
+  }
+  .file-card:hover { border-color: var(--accent-dim); }
+
+  .file-path {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85em;
+    color: var(--cyan);
+    margin-bottom: 10px;
+    word-break: break-all;
+  }
+  .file-card h4 {
+    color: var(--text);
+    font-size: 1.05em;
+    margin-bottom: 8px;
+  }
+  .file-card .what, .file-card .why, .file-card .how {
+    font-size: 0.92em;
+    margin-bottom: 8px;
+    padding-left: 14px;
+    position: relative;
+  }
+  .file-card .what::before, .file-card .why::before, .file-card .how::before {
+    position: absolute;
+    left: 0;
+    font-weight: 700;
+    font-size: 0.8em;
+  }
+  .file-card .what { color: var(--text); }
+  .file-card .why { color: var(--text-dim); }
+  .file-card .how { color: var(--text-dim); }
+
+  .label {
+    display: inline-block;
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .label-what { background: var(--blue-dim); color: var(--blue); }
+  .label-why { background: var(--green-dim); color: var(--green); }
+  .label-how { background: var(--orange-dim); color: var(--orange); }
+
+  /* Directory tree */
+  .tree {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 28px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85em;
+    line-height: 1.9;
+    overflow-x: auto;
+    margin-bottom: 32px;
+    white-space: pre;
+  }
+  .tree .dir { color: var(--accent); font-weight: 600; }
+  .tree .file { color: var(--text-dim); }
+  .tree .comment { color: #555; font-style: italic; }
+
+  /* Group headers within sections */
+  .group-header {
+    color: var(--orange);
+    font-size: 1.15em;
+    font-weight: 600;
+    margin-top: 36px;
+    margin-bottom: 14px;
+    padding-left: 4px;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 48px 0;
+  }
+
+  /* Analogy callouts */
+  .analogy {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 20px 0;
+    font-size: 0.93em;
+  }
+  .analogy-label {
+    color: var(--pink);
+    font-weight: 700;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .analogy p { color: var(--text-dim); }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .hero { padding: 36px 20px 30px; }
+    .hero h1 { font-size: 1.6em; }
+    .container { padding: 24px 16px; }
+    .toc-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Strata Project Guide</h1>
+  <p class="subtitle">A complete beginner-friendly breakdown of every directory, file, and concept in your Minecraft mod project.</p>
+</div>
+
+<div class="container">
+
+<!-- ============================================ -->
+<!-- TABLE OF CONTENTS -->
+<!-- ============================================ -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <div class="toc-grid">
+    <a href="#big-picture">1. The Big Picture</a>
+    <a href="#key-concepts">2. Key Concepts for Beginners</a>
+    <a href="#directory-overview">3. Directory Tree Overview</a>
+    <a href="#root-files">4. Root-Level Files</a>
+    <a href="#gradle-build">5. Gradle &amp; Build System</a>
+    <a href="#strata-core">6. strata-core Module</a>
+    <a href="#strata-world">7. strata-world Module</a>
+    <a href="#docs">8. Documentation Files</a>
+    <a href="#tooling">9. Tooling &amp; Editor Config</a>
+    <a href="#tests">10. Test Files</a>
+    <a href="#resources">11. Resource Files (JSON)</a>
+    <a href="#how-it-all-connects">12. How It All Connects</a>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 1. BIG PICTURE -->
+<!-- ============================================ -->
+<div class="section-header" id="big-picture">
+  <h2>1. The Big Picture</h2>
+  <p>What is this project, and what is it trying to do?</p>
+</div>
+
+<div class="concept">
+  <h3>What is Strata?</h3>
+  <p><strong>Strata</strong> is a <em>Minecraft mod</em> — a program that modifies and extends the game. Specifically, it's built for the <strong>Fabric</strong> mod loader (one of the main tools people use to run mods on Minecraft Java Edition). The mod is written in <strong>Java</strong>, which is the same language Minecraft itself is built in.</p>
+</div>
+
+<div class="concept">
+  <h3>What does it do?</h3>
+  <p>Strata is designed as a <strong>modular ecosystem</strong> — a family of related mods that share a common foundation and update together. Right now it has two modules: <strong>strata-core</strong> (shared tools and systems that other modules use) and <strong>strata-world</strong> (custom biomes and an in-game biome editor). The vision includes future modules for structures, RPG systems, and an in-game asset creation tool.</p>
+</div>
+
+<div class="concept">
+  <h3>Why is it split into modules?</h3>
+  <p>Think of it like LEGO sets. Each set (module) can work on its own, but they all share the same base plate (strata-core). If you only want custom biomes, you only need strata-core + strata-world. This <strong>modular</strong> approach keeps things organized and means you can develop, test, and update each piece independently.</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 2. KEY CONCEPTS -->
+<!-- ============================================ -->
+<div class="section-header" id="key-concepts">
+  <h2>2. Key Concepts for Beginners</h2>
+  <p>Terms and ideas you'll see throughout this project.</p>
+</div>
+
+<div class="analogy">
+  <div class="analogy-label">Analogy: A Restaurant Kitchen</div>
+  <p>Think of this project like a restaurant. <strong>Java</strong> is the language the recipes are written in. <strong>Gradle</strong> is the kitchen equipment that combines raw ingredients (your code) into a finished dish (a runnable mod). <strong>Fabric</strong> is the restaurant's management system — it knows how to take your finished dish and serve it to the customer (Minecraft). A <strong>Mixin</strong> is like sneaking into the restaurant's original recipe book and penciling in changes to an existing recipe without rewriting the whole thing.</p>
+</div>
+
+<div class="concept">
+  <h3>Java</h3>
+  <p>The programming language used to write the mod. Java code lives in <code>.java</code> files. Each file typically defines a <strong>class</strong> — think of a class as a blueprint for a thing (like a blueprint for a "Biome Editor" or a "Magic Wand"). Minecraft itself is written in Java, which is why mods for Java Edition are also written in Java.</p>
+</div>
+
+<div class="concept">
+  <h3>Gradle (the Build System)</h3>
+  <p>Gradle is a tool that takes all your code and <strong>builds</strong> it — meaning it compiles the Java into a format the computer can run, packages it up, and downloads any libraries you need. Files like <code>build.gradle</code>, <code>settings.gradle</code>, and <code>gradle.properties</code> are all instructions for Gradle. You don't edit these often — they mostly configure "how to build this project."</p>
+</div>
+
+<div class="concept">
+  <h3>Fabric (the Mod Loader)</h3>
+  <p>Fabric is the system that loads your mod into Minecraft. It's like a plugin manager for the game. Fabric provides APIs (pre-built tools and functions) that make it easier to add things to Minecraft without rewriting the whole game. The file <code>fabric.mod.json</code> tells Fabric: "Here's my mod, here's what it's called, and here are the entry points where my code starts running."</p>
+</div>
+
+<div class="concept">
+  <h3>Mixins</h3>
+  <p>Mixins are a powerful (and somewhat advanced) technique. They let you <strong>inject your own code into Minecraft's existing code</strong> at specific points, without having direct access to Minecraft's source files. For example, Strata uses a mixin to change what color the water appears when you're in the biome editor. It's like intercepting a phone call and adding your own message before passing it along.</p>
+</div>
+
+<div class="concept">
+  <h3>Packages &amp; Namespaces</h3>
+  <p>Java files are organized into <strong>packages</strong> — like folders within folders. This project uses <code>io.strata.core</code> and <code>io.strata.world</code> as its base packages. The deep folder nesting you see (like <code>src/main/java/io/strata/core/</code>) is just Java's way of organizing code by its package name. Each dot in the package name maps to a folder.</p>
+</div>
+
+<div class="concept">
+  <h3>JSON (JavaScript Object Notation)</h3>
+  <p>JSON files store structured data in a human-readable format. In this project, they define things like biome properties (what colors, what temperature), mod metadata, language translations, and world presets. They're the "data" that your Java code reads and acts on.</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 3. DIRECTORY TREE -->
+<!-- ============================================ -->
+<div class="section-header" id="directory-overview">
+  <h2>3. Directory Tree Overview</h2>
+  <p>The top-level layout of your project, with annotations.</p>
+</div>
+
+<div class="tree">
+<span class="dir">strata/</span> <span class="comment">← The project root (everything lives inside here)</span>
+├── <span class="dir">.claude/</span> <span class="comment">← Settings for Claude Code (your AI coding assistant)</span>
+├── <span class="dir">.git/</span> <span class="comment">← Git version control history (auto-managed, don't edit)</span>
+├── <span class="dir">.gradle/</span> <span class="comment">← Gradle's cache (auto-generated, don't edit)</span>
+├── <span class="dir">.vscode/</span> <span class="comment">← VS Code editor settings</span>
+├── <span class="dir">build/</span> <span class="comment">← Compiled output from Gradle (auto-generated)</span>
+├── <span class="dir">docs/</span> <span class="comment">← Project documentation (architecture, specs, reviews)</span>
+│   ├── <span class="file">ARCHITECTURE.md</span>
+│   ├── <span class="dir">mods/</span> <span class="comment">← Per-module design specs</span>
+│   │   ├── <span class="dir">strata-core/</span>
+│   │   ├── <span class="dir">strata-creator/</span>
+│   │   └── <span class="dir">strata-world/</span>
+│   ├── <span class="dir">reviews/</span> <span class="comment">← Code review & test reports</span>
+│   └── <span class="dir">workflow/</span> <span class="comment">← Development process guides</span>
+├── <span class="dir">gradle/</span> <span class="comment">← Gradle wrapper (ensures everyone uses same version)</span>
+│   └── <span class="dir">wrapper/</span>
+├── <span class="dir">strata-core/</span> <span class="comment">← MODULE: Shared foundation code</span>
+│   ├── <span class="file">build.gradle</span> <span class="comment">← This module's build config</span>
+│   └── <span class="dir">src/</span>
+│       ├── <span class="dir">main/java/io/strata/core/</span> <span class="comment">← Source code</span>
+│       ├── <span class="dir">main/resources/</span> <span class="comment">← Mod metadata &amp; assets</span>
+│       └── <span class="dir">test/</span> <span class="comment">← Unit tests</span>
+├── <span class="dir">strata-world/</span> <span class="comment">← MODULE: Biomes &amp; world generation</span>
+│   ├── <span class="file">build.gradle</span>
+│   └── <span class="dir">src/</span>
+│       ├── <span class="dir">main/java/io/strata/world/</span>
+│       ├── <span class="dir">main/resources/</span>
+│       └── <span class="dir">test/</span>
+├── <span class="file">.gitignore</span> <span class="comment">← Tells Git which files NOT to track</span>
+├── <span class="file">build.gradle</span> <span class="comment">← Root build configuration (shared settings)</span>
+├── <span class="file">gradle.properties</span> <span class="comment">← Version numbers and build settings</span>
+├── <span class="file">gradlew</span> / <span class="file">gradlew.bat</span> <span class="comment">← Gradle launcher scripts (Mac/Linux &amp; Windows)</span>
+├── <span class="file">README.md</span> <span class="comment">← Project overview (what you see on GitHub)</span>
+└── <span class="file">settings.gradle</span> <span class="comment">← Tells Gradle which modules exist</span>
+</div>
+
+<div class="analogy">
+  <div class="analogy-label">Analogy: Why This Structure?</div>
+  <p>Think of the root folder as a company headquarters. The <code>strata-core</code> and <code>strata-world</code> folders are like departments — each has its own office (source code), its own supplies (resources), and its own quality-check team (tests). The root-level files (<code>build.gradle</code>, <code>settings.gradle</code>, etc.) are like company-wide policies that all departments follow. The <code>docs</code> folder is the company wiki. The <code>.gradle</code> and <code>build</code> folders are the factory floor — machines produce things there automatically, and you never need to go inside.</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 4. ROOT-LEVEL FILES -->
+<!-- ============================================ -->
+<div class="section-header" id="root-files">
+  <h2>4. Root-Level Files</h2>
+  <p>The files sitting at the very top of the project.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">README.md</div>
+  <h4>The Project's Front Page</h4>
+  <p><span class="label label-what">WHAT</span> A Markdown document that introduces the project. It describes the philosophy ("most mod ecosystems fragment over time — Strata solves this"), lists all planned modules with their status, and links to the architecture docs.</p>
+  <p><span class="label label-why">WHY</span> Every open-source or collaborative project has a README. It's the first thing anyone sees when they open the project. It answers: "What is this? What does it do? How do I get started?"</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">.gitignore</div>
+  <h4>Git's "Ignore List"</h4>
+  <p><span class="label label-what">WHAT</span> A list of file patterns that Git (your version control system) should <em>not</em> track. Includes <code>.gradle/</code>, <code>build/</code>, IDE files, OS junk files like <code>.DS_Store</code>, and Minecraft run directories.</p>
+  <p><span class="label label-why">WHY</span> You don't want to upload thousands of auto-generated build files or personal IDE settings to your repository. That would be like uploading your kitchen trash along with your recipe book. This file keeps the repo clean.</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 5. GRADLE & BUILD SYSTEM -->
+<!-- ============================================ -->
+<div class="section-header" id="gradle-build">
+  <h2>5. Gradle &amp; the Build System</h2>
+  <p>Files that control how your code gets compiled and packaged.</p>
+</div>
+
+<div class="analogy">
+  <div class="analogy-label">Analogy: Gradle = The Factory</div>
+  <p>Your Java code is the raw material. Gradle is the factory that processes it. <code>build.gradle</code> is the factory blueprint. <code>gradle.properties</code> is the spec sheet ("use this version of Minecraft, this version of Java"). <code>settings.gradle</code> is the list of product lines ("we make strata-core and strata-world"). The <code>gradlew</code> script is the "start the factory" button.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">settings.gradle</div>
+  <h4>Module Registry</h4>
+  <p><span class="label label-what">WHAT</span> Tells Gradle: "This project is called 'strata' and it contains two sub-modules: <code>strata-core</code> and <code>strata-world</code>." Also configures where Gradle downloads Fabric's build tools from.</p>
+  <p><span class="label label-why">WHY</span> Without this file, Gradle wouldn't know the sub-folders are separate buildable modules. It's the master manifest for the whole multi-module project (called a "monorepo" — everything in one repository).</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">build.gradle <span style="color: var(--text-dim);">(root)</span></div>
+  <h4>Shared Build Configuration</h4>
+  <p><span class="label label-what">WHAT</span> Defines settings that apply to <em>all</em> modules: which version of Minecraft to target, which Fabric API version to use, how to compile Java, and how to package the final mod JARs. It uses the <code>fabric-loom</code> plugin, which is Fabric's special build tool.</p>
+  <p><span class="label label-why">WHY</span> Instead of duplicating the same Minecraft version, Java version, and Fabric settings in every module, you write it once here and all modules inherit it. DRY principle — "Don't Repeat Yourself."</p>
+  <p><span class="label label-how">HOW</span> The <code>subprojects { ... }</code> block runs for each module. It applies the Fabric Loom plugin, sets the Minecraft/Yarn/Fabric dependencies, and configures Java compilation to target Java 21.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">gradle.properties</div>
+  <h4>Version Numbers &amp; Settings</h4>
+  <p><span class="label label-what">WHAT</span> A simple key-value file holding all version numbers: Minecraft (<code>1.21.11</code>), Fabric loader (<code>0.18.4</code>), Yarn mappings, Cloth Config, Strata itself (<code>0.1.0</code>), and Java version (<code>21</code>). Also sets Gradle's memory limit to 2GB.</p>
+  <p><span class="label label-why">WHY</span> When a new Minecraft version drops, you update version numbers in <em>one file</em> instead of hunting through multiple build scripts. Think of it as the project's central "settings panel."</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">gradlew &amp; gradlew.bat</div>
+  <h4>Gradle Launcher Scripts</h4>
+  <p><span class="label label-what">WHAT</span> Shell scripts that download and run the correct version of Gradle automatically. <code>gradlew</code> is for Mac/Linux, <code>gradlew.bat</code> is for Windows. The <code>gradle/wrapper/</code> folder contains the tiny JAR that makes this work.</p>
+  <p><span class="label label-why">WHY</span> This guarantees everyone building the project uses the exact same Gradle version, regardless of what's installed on their computer. It eliminates "works on my machine" problems.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/build.gradle</div>
+  <h4>Core Module's Build Config</h4>
+  <p><span class="label label-what">WHAT</span> Additional dependencies specific to strata-core: <strong>Cloth Config</strong> (a library for creating in-game settings screens) and <strong>JUnit</strong> (a testing framework). It also bundles Cloth Config inside the mod JAR so players don't have to install it separately.</p>
+  <p><span class="label label-why">WHY</span> Each module can have its own unique libraries. Core needs Cloth Config for settings; other modules might need different things. Keeping this separate from the root <code>build.gradle</code> keeps things organized.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/build.gradle</div>
+  <h4>World Module's Build Config</h4>
+  <p><span class="label label-what">WHAT</span> Declares that strata-world <em>depends on</em> strata-core (<code>project(':strata-core')</code>), plus its own copy of Cloth Config and JUnit for testing.</p>
+  <p><span class="label label-why">WHY</span> This line — <code>modImplementation project(':strata-core')</code> — is the dependency chain in action. It means strata-world can use any class from strata-core. It's like saying "this department needs access to the shared services department."</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 6. STRATA-CORE MODULE -->
+<!-- ============================================ -->
+<div class="section-header" id="strata-core">
+  <h2>6. strata-core — The Shared Foundation</h2>
+  <p>Everything that other modules rely on. Think of it as the "shared library" or "common toolkit."</p>
+</div>
+
+<div class="analogy">
+  <div class="analogy-label">Analogy: The Shared Toolbox</div>
+  <p>If each Strata module is a builder working on a different part of a house, strata-core is the shared toolbox. It has the logging system (a notebook everyone writes in), the event system (a walkie-talkie network), the config system (shared blueprints), and the wand registry (a universal remote that routes to the right tool). No module reinvents these — they all reach into the same toolbox.</p>
+</div>
+
+<div class="group-header">Entry Points (Where the mod starts)</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/StrataCore.java</div>
+  <h4>Server-Side Entry Point</h4>
+  <p><span class="label label-what">WHAT</span> The very first code that runs when Minecraft loads this mod on the server side (the part that manages game logic). It initializes the config system, the attachment system (for storing data on players), the event system, and the wand handler registry. It also detects when a player joins for the very first time.</p>
+  <p><span class="label label-why">WHY</span> Every Fabric mod needs an entry point — a class that implements <code>ModInitializer</code>. This is Fabric's way of knowing "run this code when the game starts." Think of it as the mod's <code>main()</code> function.</p>
+  <p><span class="label label-how">HOW</span> Fabric reads the <code>fabric.mod.json</code> file, finds the entry point class listed there, and calls its <code>onInitialize()</code> method. That method then calls all the setup functions in a specific order.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/StrataCoreClient.java</div>
+  <h4>Client-Side Entry Point</h4>
+  <p><span class="label label-what">WHAT</span> The client-side counterpart. "Client" means the part of the game that runs on your computer and handles rendering, graphics, and user interface. Currently this file is mostly empty — a placeholder for future client-only setup.</p>
+  <p><span class="label label-why">WHY</span> Minecraft has two "sides": server (game logic, world data) and client (graphics, input, UI). Some code should only run on one side. Having separate entry points lets you keep that clean.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/StrataVersion.java</div>
+  <h4>Version Constants</h4>
+  <p><span class="label label-what">WHAT</span> A simple file that stores the mod's version number (<code>"0.1.0"</code>), the mod's unique ID (<code>"strata_core"</code>), and a helper method to look up the current Minecraft version from Fabric.</p>
+  <p><span class="label label-why">WHY</span> Having version info in one centralized place means other parts of the code can display it (like in startup banners or debug screens) without hardcoding the version everywhere.</p>
+</div>
+
+<div class="group-header">Configuration System</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/config/StrataCoreConfig.java</div>
+  <h4>Core Settings Definition</h4>
+  <p><span class="label label-what">WHAT</span> Defines the settings that strata-core offers: <code>verboseLogging</code> (should the mod print extra debug info?) and <code>showStartupBanner</code> (show the fancy startup message?). Both are simple on/off toggles.</p>
+  <p><span class="label label-why">WHY</span> Giving users configurable settings makes the mod flexible. Someone debugging a problem can turn on verbose logging; someone who finds the startup banner annoying can turn it off. These get saved to a TOML file on disk so they persist between game sessions.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/config/StrataConfigHelper.java</div>
+  <h4>Configuration Utility</h4>
+  <p><span class="label label-what">WHAT</span> A helper that wraps the Cloth Config / AutoConfig library. Provides simple <code>register()</code> and <code>get()</code> methods so any module can load and save configuration files without dealing with the library's complexity directly.</p>
+  <p><span class="label label-why">WHY</span> Instead of every module writing boilerplate code to set up configuration, they call one method from this helper. It's a "wrapper" — a thin layer that makes a complex thing simpler to use.</p>
+</div>
+
+<div class="group-header">Event System</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/event/StrataEvents.java</div>
+  <h4>Central Event Bus</h4>
+  <p><span class="label label-what">WHAT</span> Defines all the custom events that Strata modules can "fire" (trigger) and "listen to" (react to). Events include: <em>Strata fully initialized</em>, <em>player joined for the first time</em>, <em>player respawned</em>, <em>player data loaded/saving</em>, and <em>a custom asset was registered</em>.</p>
+  <p><span class="label label-why">WHY</span> Events are a way for different parts of the code to communicate <strong>without knowing about each other</strong>. Module A says "hey, a player just joined for the first time!" and Module B can react to that without Module A ever importing Module B's code. This keeps modules loosely coupled (independent).</p>
+  <p><span class="label label-how">HOW</span> Uses Fabric's <code>EventFactory</code> to create typed event hooks. Any module can register a "listener" (a function that runs when the event fires). When the event fires, all registered listeners are called in order.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/event/callback/*.java</div>
+  <h4>Event Callback Interfaces (6 files)</h4>
+  <p><span class="label label-what">WHAT</span> Each file defines a single interface (a "contract" or "shape") for one event type. For example, <code>PlayerFirstJoin.java</code> says: "any listener for this event must accept a <code>ServerPlayerEntity</code> parameter." The six callbacks are: <code>StrataInitialized</code>, <code>PlayerFirstJoin</code>, <code>PlayerRespawn</code>, <code>PlayerDataLoaded</code>, <code>PlayerDataSaving</code>, and <code>AssetRegistered</code>.</p>
+  <p><span class="label label-why">WHY</span> Interfaces define the "shape" of the conversation. They're like saying: "If you want to listen for the 'player first join' event, you must provide a function that takes a player as input." This makes the code type-safe — the compiler catches mistakes before the game even runs.</p>
+</div>
+
+<div class="group-header">Registries &amp; Wand System</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/registry/StrataRegistry.java</div>
+  <h4>Block/Item/Entity Registration Helper</h4>
+  <p><span class="label label-what">WHAT</span> Provides simple methods to register new blocks, items, and entity types with Minecraft's internal registry. Methods like <code>registerBlock()</code> and <code>registerItem()</code> take a mod ID and a name, and handle all the boilerplate of creating properly namespaced identifiers.</p>
+  <p><span class="label label-why">WHY</span> Minecraft requires everything (blocks, items, entities) to be "registered" with a unique ID like <code>strata_world:strata_wand</code>. This helper hides the repetitive registration code so modules can register things in one line.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/wand/StrataWandRegistry.java</div>
+  <h4>Wand Handler Registry</h4>
+  <p><span class="label label-what">WHAT</span> A central registry where each module registers its "wand handler" — the code that should run when a player right-clicks with the Strata Wand. When the wand is used, this registry checks all registered handlers to find which one(s) match the current context (what the player is looking at, where they are, etc.).</p>
+  <p><span class="label label-why">WHY</span> The Strata Wand is a universal tool — one wand, many editors. This registry is what makes that possible. strata-world registers a "biome editor" handler; a future strata-structures module could register a "structure editor" handler. The wand asks the registry "who wants to handle this?" and routes accordingly.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/wand/WandHandler.java</div>
+  <h4>Wand Handler Interface</h4>
+  <p><span class="label label-what">WHAT</span> An interface (contract) that every wand handler must implement. It requires four methods: <code>getId()</code> (unique name), <code>getDisplayName()</code> (human-readable name), <code>matches()</code> (should this handler activate?), and <code>handle()</code> (do the thing).</p>
+  <p><span class="label label-why">WHY</span> By defining this interface in strata-core, any module can create a wand handler without knowing about other modules. It's a "plugin system" for the wand.</p>
+</div>
+
+<div class="group-header">Utilities</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/util/StrataLogger.java</div>
+  <h4>Logging Utility</h4>
+  <p><span class="label label-what">WHAT</span> A unified logging system with <code>info()</code>, <code>warn()</code>, <code>error()</code>, and <code>debug()</code> methods. Debug messages only print when <code>verboseLogging</code> is enabled in the config. All log messages are prefixed with "Strata" so you can find them easily in log files.</p>
+  <p><span class="label label-why">WHY</span> Logging is essential for debugging. Instead of each file creating its own logger, they all use this shared one with consistent formatting and respect for the verboseLogging setting.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/util/StrataNbtHelper.java</div>
+  <h4>NBT Data Utility</h4>
+  <p><span class="label label-what">WHAT</span> Helper methods for working with NBT (Named Binary Tag) data — Minecraft's format for saving structured data to disk. Provides convenience methods for saving/loading identifiers and string lists.</p>
+  <p><span class="label label-why">WHY</span> NBT is Minecraft's native data format (used for player data, chunk data, item data, etc.). Writing raw NBT code is tedious and error-prone, so this helper simplifies common operations.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/java/io/strata/core/attachment/StrataAttachments.java</div>
+  <h4>Player Data Attachments</h4>
+  <p><span class="label label-what">WHAT</span> Defines persistent data that gets attached to each player using Fabric's attachment system: <code>PLAYER_INITIALIZED</code> (has this player been set up before?) and <code>PLAYER_TAGS</code> (a flexible key-value map for future use).</p>
+  <p><span class="label label-why">WHY</span> Minecraft doesn't natively support custom per-player data. Fabric's attachment system lets you "attach" data to players that automatically saves and loads with the world. This is how the mod remembers "has this player seen the welcome message?"</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 7. STRATA-WORLD MODULE -->
+<!-- ============================================ -->
+<div class="section-header" id="strata-world">
+  <h2>7. strata-world — Biomes &amp; World Generation</h2>
+  <p>Custom biomes, world generation, and the in-game Biome Editor.</p>
+</div>
+
+<div class="analogy">
+  <div class="analogy-label">Analogy: The World-Building Department</div>
+  <p>If strata-core is the shared toolbox, strata-world is the landscaping team. It creates new types of terrain (biomes), provides an in-game editor so players can design biomes visually, and hooks into Minecraft's world generation engine to place custom biomes in the game world. The "mixins" are like the team reaching into Minecraft's terrain-painting machinery and adding their own colors to the palette.</p>
+</div>
+
+<div class="group-header">Module Entry Points</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/StrataWorld.java</div>
+  <h4>Server-Side Entry Point</h4>
+  <p><span class="label label-what">WHAT</span> The main initialization file for strata-world. Sets up everything in a specific order: registers configuration, initializes biomes, hooks into world generation, registers the Strata Wand item, registers the biome editor as a wand handler, sets up networking, and configures first-join behavior (auto-gives the wand and shows a welcome message in the special "Biome Design World").</p>
+  <p><span class="label label-why">WHY</span> Just like strata-core has its entry point, each module needs its own. This is where strata-world "plugs into" the game. The careful ordering matters — you can't register a wand handler before the wand registry exists, for example.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/StrataWorldClient.java</div>
+  <h4>Client-Side Entry Point</h4>
+  <p><span class="label label-what">WHAT</span> Handles client-only concerns: listening for the server's "open the editor" message and displaying the editor screen, saving editor drafts when the player disconnects, restoring drafts when they reconnect, and ticking the preview zone manager every frame.</p>
+  <p><span class="label label-why">WHY</span> The biome editor UI is entirely client-side — it's your screen, your mouse clicks, your color sliders. The server just says "open the editor" and the client handles everything visual. This separation is important in multiplayer (the server doesn't render graphics).</p>
+</div>
+
+<div class="group-header">Configuration &amp; Biome Registry</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/config/WorldConfig.java</div>
+  <h4>World Module Settings</h4>
+  <p><span class="label label-what">WHAT</span> Configuration options for strata-world: master on/off toggle, biome frequency (how common custom biomes are), noise parameters for the "Verdant Highlands" biome, and editor settings like debounce delays and undo stack depth.</p>
+  <p><span class="label label-why">WHY</span> Makes the mod customizable without changing code. Server admins can tweak biome rarity; users can adjust how many undo steps the editor keeps. "Debounce" means "wait a moment before applying changes" — this prevents the game from constantly regenerating chunks while you're dragging a slider.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/biome/StrataBiomes.java</div>
+  <h4>Biome Registry Keys</h4>
+  <p><span class="label label-what">WHAT</span> Defines the identity of each custom biome as a "registry key" — currently just one: <code>VERDANT_HIGHLANDS</code> (a rolling, forested hill biome). The actual biome data (colors, temperature, etc.) lives in the JSON files; this Java file just declares "a biome with this name exists."</p>
+  <p><span class="label label-why">WHY</span> Minecraft needs to know about biomes at startup so it can reference them during world generation. This file creates the "name tag" for each biome; the JSON file fills in the details.</p>
+</div>
+
+<div class="group-header">World Generation</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/worldgen/StrataWorldgen.java</div>
+  <h4>Biome Injection into World Gen</h4>
+  <p><span class="label label-what">WHAT</span> The core world generation logic. Contains the math that determines <em>where</em> custom biomes appear in the world using Minecraft's "multi-noise" system (biomes are placed based on temperature, humidity, continentalness, etc.). Reads values from the config file.</p>
+  <p><span class="label label-why">WHY</span> This is what actually makes custom biomes appear in newly generated terrain. Without this, you'd have a biome definition that the game never places anywhere.</p>
+  <p><span class="label label-how">HOW</span> Minecraft generates terrain using "noise parameters" — mathematical values that vary across the world map. Each biome occupies a region of this parameter space. This code adds Strata's biomes to that parameter list, so the game knows "if temperature is X and humidity is Y, place Verdant Highlands here."</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/worldgen/StrataWorldEvents.java</div>
+  <h4>World Gen Event Hooks</h4>
+  <p><span class="label label-what">WHAT</span> The "orchestrator" for world generation events. Gets called by the mixin (see below) and delegates to <code>StrataWorldgen</code>. Also registers any biome modifications via Fabric's BiomeModifications API.</p>
+  <p><span class="label label-why">WHY</span> Keeps the mixin code minimal (mixins should be as small as possible since they're injected into Minecraft's code) and delegates to clean, testable Java methods.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/worldgen/StrataWorldFeatures.java</div>
+  <h4>Biome Feature Modifications</h4>
+  <p><span class="label label-what">WHAT</span> Reserved for modifying features (trees, flowers, ores) in vanilla or custom biomes. Currently empty — Strata biomes define their features directly in their JSON files to avoid a known Fabric bug with "feature order cycles."</p>
+  <p><span class="label label-why">WHY</span> Having this file ready means the architecture is prepared for when feature modifications are needed. The comment in the code explains the technical reason for the current approach.</p>
+</div>
+
+<div class="group-header">Mixins (Modifying Minecraft's Code)</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/mixin/VanillaBiomeParametersMixin.java</div>
+  <h4>Biome Injection Mixin</h4>
+  <p><span class="label label-what">WHAT</span> Injects code at the <em>end</em> of Minecraft's method that writes overworld biome parameters. After vanilla finishes adding all its biomes, this mixin appends Strata's biomes to the list.</p>
+  <p><span class="label label-why">WHY</span> Fabric's API doesn't provide a native way to add overworld biomes (as of MC 1.21). This mixin is necessary to "sneak" custom biomes into vanilla's biome list. It's the least-invasive approach — it doesn't modify any existing biome, just adds to the end of the list.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/mixin/BiomeMixin.java</div>
+  <h4>Visual Override Mixin (Editor)</h4>
+  <p><span class="label label-what">WHAT</span> Intercepts Minecraft's biome color methods (<code>getWaterColor()</code>, <code>getGrassColorAt()</code>, <code>getFoliageColor()</code>, <code>hasPrecipitation()</code>) and returns the editor's values instead when the biome editor is open.</p>
+  <p><span class="label label-why">WHY</span> This is how the editor provides <strong>instant visual preview</strong>. When you change the water color slider in the editor, this mixin makes all water in the world immediately reflect that new color — no world regeneration needed. It's "Layer 1" — fast visual changes.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/mixin/EnvironmentAttributeMapMixin.java</div>
+  <h4>Sky/Fog Override Mixin (Editor)</h4>
+  <p><span class="label label-what">WHAT</span> Similar to BiomeMixin but targets sky color, fog color, and water fog color. In Minecraft 1.21, these colors moved to a different system (<code>EnvironmentAttributeMap</code>), so they need a separate mixin.</p>
+  <p><span class="label label-why">WHY</span> Minecraft's internals change between versions. Sky/fog colors used to be on the Biome object directly, but were moved. This mixin targets the new location so the editor's color overrides still work.</p>
+</div>
+
+<div class="group-header">The Biome Editor</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/editor/BiomeEditorScreen.java</div>
+  <h4>The Editor UI</h4>
+  <p><span class="label label-what">WHAT</span> The main editor window — a full-screen interface with a header bar (biome name, ID, action buttons), a sidebar with five tabs (Visual, Terrain, Features, Spawns, Export), and a content area. Supports keyboard shortcuts (Ctrl+Z for undo, Ctrl+Y for redo, arrow keys and Tab for navigation).</p>
+  <p><span class="label label-why">WHY</span> This is the heart of the mod's user experience. Instead of manually writing JSON files to create biomes (which is what you'd normally have to do), players get a visual, interactive editor.</p>
+  <p><span class="label label-how">HOW</span> Extends Fabric's <code>Screen</code> class, which provides the basic framework for custom game screens. The <code>render()</code> method draws everything each frame. The <code>mouseClicked()</code> and <code>keyPressed()</code> methods handle input.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/editor/BiomeEditorState.java</div>
+  <h4>Editor State (The Data Model)</h4>
+  <p><span class="label label-what">WHAT</span> Holds <em>all</em> the data for the biome being edited: colors (sky, fog, water, grass, foliage), weather (rain/snow), terrain noise parameters, feature list, mob spawn entries, display name, biome ID, export status, and an undo/redo manager. Can serialize itself to/from JSON for draft saving.</p>
+  <p><span class="label label-why">WHY</span> Separating the data (state) from the UI (screen) is a fundamental design pattern. The state can be saved, loaded, copied, undone, and serialized independently of how it's displayed. The screen just reads from the state and writes to it.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/editor/BiomeEditorSession.java</div>
+  <h4>Editor Session Manager</h4>
+  <p><span class="label label-what">WHAT</span> A singleton (only one instance exists at a time) that tracks whether the editor is currently open, and holds references to the active editor state and preview zone manager. The mixins check <code>BiomeEditorSession.isActive()</code> to decide whether to apply color overrides.</p>
+  <p><span class="label label-why">WHY</span> The editor state needs to be accessible from multiple places: the screen, the mixins, the preview system, the network handler. This singleton acts as the central "is the editor open, and if so, what's the current state?" accessor.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/editor/tabs/*.java</div>
+  <h4>Editor Tab Panels (6 files)</h4>
+  <p><span class="label label-what">WHAT</span> Each tab is a separate class handling one section of the editor:</p>
+  <p style="margin-left: 14px;">
+    <strong>EditorTab.java</strong> — Abstract base class that all tabs extend.<br>
+    <strong>VisualTab.java</strong> — Color picker with RGB sliders for sky, fog, water, grass, foliage colors + weather toggles (rain/snow).<br>
+    <strong>TerrainTab.java</strong> — Sliders for the six multi-noise parameters (temperature, humidity, etc.) that control terrain shape.<br>
+    <strong>FeaturesTab.java</strong> — Add/remove terrain features (trees, flowers, ores) by identifier.<br>
+    <strong>SpawnsTab.java</strong> — Add/remove/edit mob spawn entries (entity type, weight, group size).<br>
+    <strong>ExportTab.java</strong> — Export the biome as JSON, save as a datapack, copy to clipboard, or save a draft.
+  </p>
+  <p><span class="label label-why">WHY</span> Splitting the editor into tabs keeps each piece manageable. Each tab only deals with its own domain. It also makes the UI navigable — you don't get overwhelmed by seeing every setting at once.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/editor/BiomeDesignWorldPreset.java</div>
+  <h4>Special World Type Detection</h4>
+  <p><span class="label label-what">WHAT</span> Registers and detects the "Strata: Biome Designer" world preset — a special world type in the "Create World" screen specifically designed for testing biomes. It can detect whether the current world was created using this preset.</p>
+  <p><span class="label label-why">WHY</span> The mod behaves differently in a "Biome Design World" — it auto-gives the wand, shows a welcome message, and is singleplayer-only. This class handles detecting that special context.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/editor/StrataWand.java</div>
+  <h4>The Wand Item</h4>
+  <p><span class="label label-what">WHAT</span> The physical in-game item that opens editors. When right-clicked, it ray-casts (shoots an invisible line) 5 blocks from the player, queries the wand registry for matching handlers, and invokes the appropriate one. If multiple handlers match, it picks the first (future versions will show a disambiguation menu).</p>
+  <p><span class="label label-why">WHY</span> The wand is the user-facing entry point to the entire editor ecosystem. One item, one right-click, and you're in the appropriate editor for your context. It's designed to scale — as more modules add handlers, the wand automatically routes to them.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/editor/BiomeEditorWandHandler.java</div>
+  <h4>Biome Editor Wand Handler</h4>
+  <p><span class="label label-what">WHAT</span> Implements the <code>WandHandler</code> interface from strata-core. ID: "biome_editor". Currently always matches (any wand use opens the biome editor). Sends a network packet to the client to open the editor screen.</p>
+  <p><span class="label label-why">WHY</span> This is the "glue" between strata-core's wand system and strata-world's biome editor. It tells the wand registry: "I exist, my name is 'biome_editor', and when activated, tell the client to open the biome editor."</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/editor/PreviewZoneManager.java</div>
+  <h4>Live Preview Coordinator</h4>
+  <p><span class="label label-what">WHAT</span> Manages the debounced (delayed) regeneration of chunks when the editor's terrain settings change. Distinguishes between "Layer 1" changes (visual, fast) and "Layer 2" changes (structural, slow). Has configurable delay timers and captures undo snapshots before regenerating.</p>
+  <p><span class="label label-why">WHY</span> Regenerating terrain chunks is expensive. You don't want to regenerate every time a slider moves by one pixel. The debounce system waits until you stop moving the slider, then regenerates once. Layer 1 (colors) can update instantly via mixins; Layer 2 (terrain shape) needs actual chunk regeneration.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/java/io/strata/world/network/OpenBiomeEditorPayload.java</div>
+  <h4>Network Packet</h4>
+  <p><span class="label label-what">WHAT</span> A server-to-client network message that carries no data — it's just a signal saying "open the biome editor." Uses Fabric's payload system with a unique ID (<code>strata_world:open_biome_editor</code>).</p>
+  <p><span class="label label-why">WHY</span> In Minecraft, the server decides what happens (game logic), and the client decides what to show (UI). The wand handler runs on the server, but the editor screen opens on the client. This packet bridges that gap. It's like the server sending a text message to the client saying "show the editor now."</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 8. DOCUMENTATION -->
+<!-- ============================================ -->
+<div class="section-header" id="docs">
+  <h2>8. Documentation Files</h2>
+  <p>Design documents, specs, reviews, and workflow guides.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">docs/ARCHITECTURE.md</div>
+  <h4>Master Architecture Document</h4>
+  <p><span class="label label-what">WHAT</span> The "constitution" of the project. Describes the vision (cohesive mod ecosystem), design principles (vanilla-first, data-driven, modular), tech stack, module hierarchy, naming conventions, monorepo strategy, version bump procedures, and development roadmap.</p>
+  <p><span class="label label-why">WHY</span> When you're "vibe coding" with an AI, this document is the source of truth. It tells Claude Code (or any developer) the project's rules and conventions. Without it, each coding session might make inconsistent decisions.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">docs/workflow/CLAUDE_CODE_GUIDE.md</div>
+  <h4>AI Development Workflow</h4>
+  <p><span class="label label-what">WHAT</span> Instructions for how to use Claude Code to develop Strata. Defines session types (scaffold, implement, fix, update), agent roles (Architect, Developer, Reviewer, Tester, Scribe), quality gates, commit conventions, and build commands.</p>
+  <p><span class="label label-why">WHY</span> This is your "how to work with the AI" playbook. It standardizes the development process so each coding session follows the same quality steps: design → build → review → test → document.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">docs/mods/strata-core/SPEC.md<br>docs/mods/strata-world/SPEC.md<br>docs/mods/strata-creator/DESIGN_INTENT.md</div>
+  <h4>Module Specifications</h4>
+  <p><span class="label label-what">WHAT</span> Detailed design specifications for each module — what it should do, how it should work, what classes and files it needs. The specs are written <em>before</em> the code, then the AI implements them.</p>
+  <p><span class="label label-why">WHY</span> "Spec-first" development means you decide what to build before building it. This prevents scope creep and gives the AI clear instructions. It's like an architect's blueprint — you don't start pouring concrete before the plans are done.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">docs/reviews/*.md</div>
+  <h4>Code Reviews &amp; Test Reports</h4>
+  <p><span class="label label-what">WHAT</span> Records of code review sessions, test results, fix lists, and human testing checklists. Organized by module and phase (e.g., <code>strata-world-phase1-review.md</code>, <code>strata-world-phase2-test-report.md</code>).</p>
+  <p><span class="label label-why">WHY</span> Quality documentation. These files track what was reviewed, what bugs were found, what was fixed, and what was tested. They're both a quality record and a learning resource for understanding why things changed.</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 9. TOOLING -->
+<!-- ============================================ -->
+<div class="section-header" id="tooling">
+  <h2>9. Tooling &amp; Editor Configuration</h2>
+  <p>Files that configure your development tools (not the mod itself).</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">.claude/settings.json</div>
+  <h4>Claude Code Permissions</h4>
+  <p><span class="label label-what">WHAT</span> Defines which commands and websites Claude Code is pre-authorized to use: Gradle commands, Git, file operations, and specific Fabric/Modrinth/GitHub URLs.</p>
+  <p><span class="label label-why">WHY</span> Claude Code asks permission before running commands. Pre-authorizing common operations (like <code>./gradlew build</code>) means it can work efficiently without asking "can I run this?" every time.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">.claude/commands/commit.md</div>
+  <h4>Custom Commit Command</h4>
+  <p><span class="label label-what">WHAT</span> A custom slash command for Claude Code that automates the git commit process: builds the project, runs tests, checks for issues, and creates a conventional commit message.</p>
+  <p><span class="label label-why">WHY</span> Standardizes the commit workflow. Instead of manually writing commit messages, Claude Code follows a defined process every time.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">.vscode/settings.json</div>
+  <h4>VS Code Settings</h4>
+  <p><span class="label label-what">WHAT</span> Editor-specific settings for Visual Studio Code, if you use it as your code editor.</p>
+  <p><span class="label label-why">WHY</span> Ensures consistent editor behavior (things like tab size, file associations) for anyone working on the project in VS Code.</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 10. TESTS -->
+<!-- ============================================ -->
+<div class="section-header" id="tests">
+  <h2>10. Test Files</h2>
+  <p>Automated tests that verify the code works correctly.</p>
+</div>
+
+<div class="analogy">
+  <div class="analogy-label">Analogy: Quality Control</div>
+  <p>Tests are like a factory's quality control department. After building a product, you run it through checks: "Does this biome have the right name? Does the config use the right default values? Does the wand registry reject duplicate handlers?" If any check fails, you know something broke — before a real player ever sees it.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/test/.../StrataWandRegistryTest.java</div>
+  <h4>Wand Registry Tests</h4>
+  <p><span class="label label-what">WHAT</span> Tests that the wand registry starts empty, correctly registers handlers, finds matching handlers, returns unmodifiable results, rejects duplicate handler IDs, and throws errors on null input.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/test/.../StrataBiomesTest.java</div>
+  <h4>Biome Registry Tests</h4>
+  <p><span class="label label-what">WHAT</span> Verifies that the Verdant Highlands biome has the correct namespace (<code>strata_world</code>) and path (<code>verdant_highlands</code>), and that the biome count is correct.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/test/.../WorldConfigDefaultsTest.java<br>strata-world/src/test/.../WorldConfigPhase2Test.java</div>
+  <h4>Configuration Tests</h4>
+  <p><span class="label label-what">WHAT</span> Verify that all config options have sensible default values and that validation rules work (e.g., biome frequency must be between 0.1 and 2.0).</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/test/.../BiomeEditorStateTest.java</div>
+  <h4>Editor State Tests</h4>
+  <p><span class="label label-what">WHAT</span> Tests the editor's data model: undo/redo behavior, state copying, dirty flag tracking, JSON serialization/deserialization.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/test/.../BiomeJsonValidationTest.java<br>strata-world/src/test/.../BiomeFrequencyOffsetTest.java<br>strata-world/src/test/.../StrataWorldEventsTest.java<br>strata-world/src/test/.../BiomeDesignWorldGameTest.java<br>strata-world/src/test/.../StrataPackManifestTest.java</div>
+  <h4>Additional Tests</h4>
+  <p><span class="label label-what">WHAT</span> Various tests covering: biome JSON structure validation, biome frequency math, world event wiring, the Biome Design World preset, and the datapack manifest format.</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 11. RESOURCES -->
+<!-- ============================================ -->
+<div class="section-header" id="resources">
+  <h2>11. Resource Files (JSON &amp; Metadata)</h2>
+  <p>Data files that Minecraft and Fabric read to know what this mod provides.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-core/src/main/resources/fabric.mod.json</div>
+  <h4>Core Module Identity Card</h4>
+  <p><span class="label label-what">WHAT</span> Tells Fabric: "This mod is called strata_core, version 0.1.0. Its server entry point is <code>StrataCore</code> and its client entry point is <code>StrataCoreClient</code>. It requires Fabric Loader 0.18+, Fabric API, Minecraft ~1.21, and Java 21+."</p>
+  <p><span class="label label-why">WHY</span> This is the mod's "passport." Without it, Fabric wouldn't know the mod exists or how to load it. Every Fabric mod must have this file.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/resources/fabric.mod.json</div>
+  <h4>World Module Identity Card</h4>
+  <p><span class="label label-what">WHAT</span> Same concept as above but for strata-world. Additionally declares a dependency on <code>strata_core</code> and references the mixin configuration file.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/resources/strata_world.mixins.json</div>
+  <h4>Mixin Configuration</h4>
+  <p><span class="label label-what">WHAT</span> Tells the mixin system which mixin classes to load and which Minecraft classes they target. Lists <code>BiomeMixin</code>, <code>EnvironmentAttributeMapMixin</code>, and <code>VanillaBiomeParametersMixin</code>.</p>
+  <p><span class="label label-why">WHY</span> Mixins need to be declared in a configuration file so the mixin processor knows to apply them. It's like a manifest saying "inject these modifications into these parts of Minecraft."</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/resources/assets/strata_world/lang/en_us.json</div>
+  <h4>English Language Strings</h4>
+  <p><span class="label label-what">WHAT</span> All user-facing text in English: the world type name ("Strata: Biome Designer"), item names ("Strata Wand"), tooltips, welcome messages, tab labels, and screen titles.</p>
+  <p><span class="label label-why">WHY</span> Minecraft uses "language files" for all displayed text. This makes the mod translatable — someone could create a <code>fr_fr.json</code> for French without changing any Java code. It also keeps user-facing text out of the code, making it easier to update wording.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/resources/data/strata_world/worldgen/biome/verdant_highlands.json</div>
+  <h4>Verdant Highlands Biome Definition</h4>
+  <p><span class="label label-what">WHAT</span> The complete data definition for the Verdant Highlands biome: temperature, downfall, colors (sky, fog, water, grass, foliage), sound effects, and terrain features (what trees, plants, and ores generate there).</p>
+  <p><span class="label label-why">WHY</span> Minecraft's world generation is "data-driven" — biomes are defined in JSON, not code. This means you can tweak biome properties without recompiling the mod. The Java code registers the biome key; this JSON fills in all the details.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/resources/data/strata_world/worldgen/world_preset/biome_designer.json</div>
+  <h4>Biome Designer World Preset</h4>
+  <p><span class="label label-what">WHAT</span> Defines the "Strata: Biome Designer" world type that appears in the Create World screen. Configures a special overworld setup designed for biome testing.</p>
+</div>
+
+<div class="file-card">
+  <div class="file-path">strata-world/src/main/resources/data/minecraft/tags/worldgen/world_preset/normal.json</div>
+  <h4>World Preset Tag</h4>
+  <p><span class="label label-what">WHAT</span> Adds the Biome Designer world preset to Minecraft's list of "normal" world types so it appears in the world creation UI alongside Default, Superflat, etc.</p>
+  <p><span class="label label-why">WHY</span> Minecraft uses "tags" to group things. The "normal" tag controls which world types appear in the Create World screen. Without adding our preset to this tag, players wouldn't be able to select it.</p>
+</div>
+
+<!-- ============================================ -->
+<!-- 12. HOW IT ALL CONNECTS -->
+<!-- ============================================ -->
+<div class="section-header" id="how-it-all-connects">
+  <h2>12. How It All Connects</h2>
+  <p>The big picture: how data and control flow through the project.</p>
+</div>
+
+<div class="concept">
+  <h3>Startup Flow</h3>
+  <p>When Minecraft launches with the mod installed, here's what happens in order:</p>
+  <p style="margin-top: 10px; padding-left: 14px;">
+    1. Fabric reads both <code>fabric.mod.json</code> files and discovers two mods<br>
+    2. Fabric calls <code>StrataCore.onInitialize()</code> → sets up config, events, wand registry<br>
+    3. Fabric calls <code>StrataWorld.onInitialize()</code> → registers biomes, worldgen, wand, editor handler<br>
+    4. On the client side, <code>StrataCoreClient</code> and <code>StrataWorldClient</code> set up client-only features<br>
+    5. When generating terrain, <code>VanillaBiomeParametersMixin</code> fires → Strata biomes get added<br>
+    6. When a player joins for the first time in a Biome Design World → they get the wand + welcome message
+  </p>
+</div>
+
+<div class="concept">
+  <h3>Editor Flow</h3>
+  <p>When a player right-clicks the Strata Wand:</p>
+  <p style="margin-top: 10px; padding-left: 14px;">
+    1. <code>StrataWand.use()</code> fires on the server<br>
+    2. Queries <code>StrataWandRegistry</code> for matching handlers<br>
+    3. <code>BiomeEditorWandHandler</code> matches → sends <code>OpenBiomeEditorPayload</code> to client<br>
+    4. Client receives packet → creates <code>BiomeEditorState</code> (restoring draft if one exists)<br>
+    5. Opens <code>BiomeEditorScreen</code> with tabs<br>
+    6. <code>BiomeEditorSession</code> becomes active → mixins start applying color overrides<br>
+    7. Player edits colors/terrain → Layer 1 changes apply instantly, Layer 2 changes debounce<br>
+    8. Player exports → JSON file written to world's datapack folder<br>
+    9. Player closes editor or disconnects → draft saved to disk
+  </p>
+</div>
+
+<div class="concept">
+  <h3>The Layer 1 / Layer 2 System</h3>
+  <p><strong>Layer 1 (Visual, instant)</strong> — Sky color, fog, water color, grass, foliage, weather. These changes are applied immediately through mixins that intercept Minecraft's rendering. No terrain regeneration needed. Controlled by <code>BiomeMixin</code> and <code>EnvironmentAttributeMapMixin</code>.</p>
+  <p style="margin-top: 8px;"><strong>Layer 2 (Structural, debounced)</strong> — Temperature, humidity, noise parameters, features, mob spawns. These require actual chunk regeneration to take effect. The <code>PreviewZoneManager</code> waits for the player to stop adjusting sliders before regenerating, to avoid wasting performance.</p>
+</div>
+
+<div class="concept">
+  <h3>The Module Dependency Chain</h3>
+  <p>
+    <code>strata-core</code> depends on nothing (except Fabric + Minecraft)<br>
+    <code>strata-world</code> depends on <code>strata-core</code><br>
+    Future modules (<code>strata-structures</code>, <code>strata-rpg</code>) will also depend on <code>strata-core</code><br>
+    <code>strata-creator</code> (future) will depend on everything, as it's the universal in-game design tool
+  </p>
+  <p style="margin-top: 8px;">This is a classic "layered architecture" — each layer can only depend on the layers below it, never above. This prevents circular dependencies and keeps the codebase clean.</p>
+</div>
+
+<div style="text-align: center; padding: 48px 0 20px; color: var(--text-dim); font-size: 0.85em;">
+  Generated for the Strata project — a Minecraft Fabric mod ecosystem.
+</div>
+
+</div><!-- /container -->
+</body>
+</html>
