@@ -17,7 +17,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -37,6 +36,9 @@ public class ExportTab extends EditorTab {
     /** Status message shown after export actions. */
     private String statusMessage = "";
     private long statusExpiry = 0L;
+
+    /** Two-click overwrite confirmation flag. */
+    private boolean confirmOverwrite = false;
 
     /** Metadata fields. */
     private TextFieldWidget nameField;
@@ -160,6 +162,14 @@ public class ExportTab extends EditorTab {
 
         Path biomeFile = datapackDir.resolve(idPath + ".json");
 
+        // Warn on overwrite — first click shows warning, second click confirms
+        if (Files.exists(biomeFile) && !confirmOverwrite) {
+            confirmOverwrite = true;
+            setStatus("File exists! Click again to overwrite: " + biomeFile.getFileName());
+            return;
+        }
+        confirmOverwrite = false;
+
         try {
             Files.createDirectories(datapackDir);
 
@@ -216,6 +226,14 @@ public class ExportTab extends EditorTab {
         Path worldRoot = mc.getServer().getSavePath(WorldSavePath.ROOT);
         Path packDir = worldRoot.resolve("strata_biomes");
         Path packFile = packDir.resolve(idPath + ".stratapack");
+
+        // Warn on overwrite — first click shows warning, second click confirms
+        if (Files.exists(packFile) && !confirmOverwrite) {
+            confirmOverwrite = true;
+            setStatus("File exists! Click again to overwrite: " + packFile.getFileName());
+            return;
+        }
+        confirmOverwrite = false;
 
         try {
             Files.createDirectories(packDir);
@@ -279,10 +297,6 @@ public class ExportTab extends EditorTab {
     private void setStatus(String message) {
         this.statusMessage = message;
         this.statusExpiry = System.currentTimeMillis() + 5000L;
-    }
-
-    private static float roundTo3(float value) {
-        return Math.round(value * 1000f) / 1000f;
     }
 
     // ── Render ───────────────────────────────────────────────────────────────

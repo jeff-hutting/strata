@@ -208,8 +208,9 @@ public class TerrainTab extends EditorTab {
             }
         }
 
-        // Status line: show if preview zone is regenerating
-        int statusY = y + 28 + PARAMS.length * ROW_STRIDE + 34;
+        // Status line: positioned below all buttons (buttons end at btnY + 38)
+        int btnY = y + 28 + PARAMS.length * ROW_STRIDE + 12;
+        int statusY = btnY + 48;
         PreviewZoneManager pzm = BiomeEditorSession.getPreviewZoneManager();
         if (pzm != null && pzm.isRegenerating()) {
             context.drawText(tr, "Refreshing preview...", x + 10, statusY, 0xFFFFAA00, false);

@@ -9,10 +9,13 @@ import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Features tab — scrollable list of placed-feature identifiers.
@@ -36,6 +39,11 @@ public class FeaturesTab extends EditorTab {
 
     /** The text field for entering new feature IDs. */
     private TextFieldWidget addField;
+
+    /** Filtered feature suggestions shown below the text field. */
+    private List<String> suggestions = List.of();
+    private static final int MAX_SUGGESTIONS = 6;
+    private static final int SUGGESTION_HEIGHT = 12;
 
     public FeaturesTab(BiomeEditorScreen screen, BiomeEditorState state) {
         super(screen, state);
@@ -61,6 +69,27 @@ public class FeaturesTab extends EditorTab {
                 Text.literal("Feature ID"));
         addField.setMaxLength(128);
         addField.setPlaceholder(Text.literal("minecraft:trees_birch_and_oak"));
+        addField.setChangedListener(text -> {
+            String query = text.strip().toLowerCase();
+            if (query.isEmpty()) {
+                suggestions = List.of();
+            } else {
+                // Use world's dynamic registry for placed features
+                var mc = MinecraftClient.getInstance();
+                if (mc.world != null) {
+                    var registry = mc.world.getRegistryManager()
+                            .getOptional(RegistryKeys.PLACED_FEATURE);
+                    if (registry.isPresent()) {
+                        suggestions = registry.get().getIds().stream()
+                                .map(Identifier::toString)
+                                .filter(id -> id.contains(query))
+                                .sorted()
+                                .limit(MAX_SUGGESTIONS)
+                                .collect(Collectors.toList());
+                    }
+                }
+            }
+        });
         screen.addTabWidget(addField);
 
         // Add button
@@ -99,6 +128,21 @@ public class FeaturesTab extends EditorTab {
 
         int mx = (int) click.x();
         int my = (int) click.y();
+
+        // Hit-test suggestion dropdown
+        if (addField != null && addField.isFocused() && !suggestions.isEmpty()) {
+            int sugX = addField.getX();
+            int sugY = addField.getY() + addField.getHeight() + 1;
+            int sugW = addField.getWidth();
+            for (int si = 0; si < suggestions.size(); si++) {
+                int rowTop = sugY + si * SUGGESTION_HEIGHT;
+                if (mx >= sugX && mx < sugX + sugW && my >= rowTop && my < rowTop + SUGGESTION_HEIGHT) {
+                    addField.setText(suggestions.get(si));
+                    suggestions = List.of();
+                    return true;
+                }
+            }
+        }
 
         // Check if user clicked on a remove [x] button
         int listY = y + 50;
@@ -202,6 +246,24 @@ public class FeaturesTab extends EditorTab {
                     x + 10, listY + 4, 0xFF999999, false);
             context.drawText(tr, "Enter a feature ID above and click Add.",
                     x + 10, listY + 18, 0xFF888888, false);
+        }
+
+        // Suggestion dropdown below the feature text field
+        if (addField != null && addField.isFocused() && !suggestions.isEmpty()) {
+            int sugX = addField.getX();
+            int sugY = addField.getY() + addField.getHeight() + 1;
+            int sugW = addField.getWidth();
+            context.fill(sugX, sugY, sugX + sugW, sugY + suggestions.size() * SUGGESTION_HEIGHT, 0xF0222244);
+            context.fill(sugX, sugY, sugX + sugW, sugY + 1, 0xFF4A90D9);
+            for (int si = 0; si < suggestions.size(); si++) {
+                int rowTop = sugY + si * SUGGESTION_HEIGHT;
+                boolean hovered = mouseX >= sugX && mouseX < sugX + sugW
+                        && mouseY >= rowTop && mouseY < rowTop + SUGGESTION_HEIGHT;
+                if (hovered) {
+                    context.fill(sugX, rowTop, sugX + sugW, rowTop + SUGGESTION_HEIGHT, 0x40FFFFFF);
+                }
+                context.drawText(tr, suggestions.get(si), sugX + 3, rowTop + 2, 0xFFCCCCCC, false);
+            }
         }
     }
 }

@@ -10,10 +10,13 @@ import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Spawns tab — list editor for mob spawn entries.
@@ -46,6 +49,11 @@ public class SpawnsTab extends EditorTab {
     private TextFieldWidget minField;
     private TextFieldWidget maxField;
 
+    /** Filtered entity suggestions shown below the text field. */
+    private List<String> suggestions = List.of();
+    private static final int MAX_SUGGESTIONS = 6;
+    private static final int SUGGESTION_HEIGHT = 12;
+
     public SpawnsTab(BiomeEditorScreen screen, BiomeEditorState state) {
         super(screen, state);
     }
@@ -70,6 +78,18 @@ public class SpawnsTab extends EditorTab {
                 Text.literal("Entity ID"));
         entityField.setMaxLength(128);
         entityField.setPlaceholder(Text.literal("minecraft:pig"));
+        entityField.setChangedListener(text -> {
+            String query = text.strip().toLowerCase();
+            if (query.isEmpty()) {
+                suggestions = List.of();
+            } else {
+                suggestions = Registries.ENTITY_TYPE.getIds().stream()
+                        .map(Identifier::toString)
+                        .filter(id -> id.contains(query))
+                        .limit(MAX_SUGGESTIONS)
+                        .collect(Collectors.toList());
+            }
+        });
         screen.addTabWidget(entityField);
 
         // Add button
@@ -177,8 +197,23 @@ public class SpawnsTab extends EditorTab {
         int mx = (int) click.x();
         int my = (int) click.y();
 
+        // Hit-test suggestion dropdown
+        if (entityField != null && entityField.isFocused() && !suggestions.isEmpty()) {
+            int sugX = entityField.getX();
+            int sugY = entityField.getY() + entityField.getHeight() + 1;
+            int sugW = entityField.getWidth();
+            for (int si = 0; si < suggestions.size(); si++) {
+                int rowTop = sugY + si * SUGGESTION_HEIGHT;
+                if (mx >= sugX && mx < sugX + sugW && my >= rowTop && my < rowTop + SUGGESTION_HEIGHT) {
+                    entityField.setText(suggestions.get(si));
+                    suggestions = List.of();
+                    return true;
+                }
+            }
+        }
+
         // Hit-test spawn rows to select for editing
-        int listY = y + 50;
+        int listY = y + 58;
         int listBottom = y + height - 70;
         int maxRows = Math.min(MAX_VISIBLE_ROWS, (listBottom - listY) / ROW_HEIGHT);
         List<SpawnEntry> entries = state.getSpawnEntries();
@@ -208,9 +243,9 @@ public class SpawnsTab extends EditorTab {
         // "Entity:" label to the left of the entity text field
         context.drawText(tr, "Entity:", x + 10, y + 31, 0xFFCCCCCC, false);
 
-        // Column headers
-        int listY = y + 50;
-        context.drawText(tr, "Entity", x + 10, listY - 12, 0xFF888888, false);
+        // Column headers — positioned below the entity field with spacing
+        int listY = y + 58;
+        context.drawText(tr, "Entity", x + 10, listY - 10, 0xFF888888, false);
         context.drawText(tr, "Wt", x + width - 100, listY - 12, 0xFF888888, false);
         context.drawText(tr, "Min", x + width - 70, listY - 12, 0xFF888888, false);
         context.drawText(tr, "Max", x + width - 40, listY - 12, 0xFF888888, false);
@@ -284,6 +319,25 @@ public class SpawnsTab extends EditorTab {
             context.drawText(tr, selLabel, x + 10, editY - 20, 0xFF4A90D9, false);
         } else {
             context.drawText(tr, "Click a row to edit", x + 10, editY - 20, 0xFF888888, false);
+        }
+
+        // Suggestion dropdown below the entity text field
+        if (entityField != null && entityField.isFocused() && !suggestions.isEmpty()) {
+            int sugX = entityField.getX();
+            int sugY = entityField.getY() + entityField.getHeight() + 1;
+            int sugW = entityField.getWidth();
+            // Background
+            context.fill(sugX, sugY, sugX + sugW, sugY + suggestions.size() * SUGGESTION_HEIGHT, 0xF0222244);
+            context.fill(sugX, sugY, sugX + sugW, sugY + 1, 0xFF4A90D9); // top border
+            for (int si = 0; si < suggestions.size(); si++) {
+                int rowTop = sugY + si * SUGGESTION_HEIGHT;
+                boolean hovered = mouseX >= sugX && mouseX < sugX + sugW
+                        && mouseY >= rowTop && mouseY < rowTop + SUGGESTION_HEIGHT;
+                if (hovered) {
+                    context.fill(sugX, rowTop, sugX + sugW, rowTop + SUGGESTION_HEIGHT, 0x40FFFFFF);
+                }
+                context.drawText(tr, suggestions.get(si), sugX + 3, rowTop + 2, 0xFFCCCCCC, false);
+            }
         }
     }
 }
