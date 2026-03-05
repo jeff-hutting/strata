@@ -8,4 +8,22 @@ pluginManagement {
 rootProject.name = 'strata'
 
 include 'strata-core'
-include 'strata-world'
+
+// fabric-loom resolves modImplementation project(':strata-core') at configuration
+// time and needs the remapped jar to exist. If we include strata-world when the
+// jar is absent, every Gradle invocation fails before any task runs.
+//
+// Solution: only include strata-world once strata-core's jar exists.
+// Use ./build.sh which runs two sequential invocations:
+//   1. ./gradlew :strata-core:build   → jar produced, strata-world not in graph
+//   2. ./gradlew :strata-world:build  → jar found, strata-world configures OK
+def coreLibs = file('strata-core/build/libs')
+def coreJarReady = coreLibs.exists() && coreLibs.listFiles()?.any { f ->
+    f.name.startsWith('strata-core-') &&
+    f.name.endsWith('.jar') &&
+    !f.name.contains('-dev.') &&
+    !f.name.contains('-sources.')
+}
+if (coreJarReady) {
+    include 'strata-world'
+}

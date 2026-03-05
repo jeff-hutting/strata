@@ -1,3 +1,5 @@
+apply from: rootProject.file('gradle/fabric-common.gradle')
+
 dependencies {
     modImplementation("me.shedaniel.cloth:cloth-config-fabric:${rootProject.cloth_config_version}") {
         exclude(group: "net.fabricmc.fabric-api")
