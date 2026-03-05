@@ -86,7 +86,7 @@ public class VisualTab extends EditorTab {
         private final int channel;
 
         ChannelSlider(int x, int y, int width, int channel) {
-            super(x, y, width, 14, Text.empty(), 0.0);
+            super(x, y, width, 20, Text.empty(), 0.0);
             this.channel = channel;
             updateMessage();
         }
@@ -220,16 +220,16 @@ public class VisualTab extends EditorTab {
         int sliderW = width - 20; // full content width minus left/right padding
 
         rSlider = new ChannelSlider(x + 10, sliderY,      sliderW, 0);
-        gSlider = new ChannelSlider(x + 10, sliderY + 18, sliderW, 1);
-        bSlider = new ChannelSlider(x + 10, sliderY + 36, sliderW, 2);
+        gSlider = new ChannelSlider(x + 10, sliderY + 24, sliderW, 1);
+        bSlider = new ChannelSlider(x + 10, sliderY + 48, sliderW, 2);
         screen.addTabWidget(rSlider);
         screen.addTabWidget(gSlider);
         screen.addTabWidget(bSlider);
         updateSliders();
 
         // Precipitation buttons — below the sliders + hex label row
-        // sliderY + 50 (three sliders) + 10 (gap) + 9 (hex label) + 12 (gap) + 14 (precip label) + 4 = sliderY + 99
-        int weatherBtnY = sliderY + 99;
+        // sliderY + 72 (three sliders @ 24px stride) + 10 (gap) + 9 (hex label) + 12 (gap) + 14 (precip label) + 4 = sliderY + 121
+        int weatherBtnY = sliderY + 121;
         screen.addTabWidget(ButtonWidget.builder(Text.literal("Rain"), b -> {
             state.setHasRain(true);
             state.setHasSnow(false);
@@ -319,7 +319,7 @@ public class VisualTab extends EditorTab {
 
         // ── Hex label (read-only display under the sliders) ──────────────────
         int sliderY = rowY(COLOR_LABELS.length) + 4;
-        int hexLabelY = sliderY + 60; // 50px (three 14px sliders + 2×8px gaps) + 10px margin
+        int hexLabelY = sliderY + 76; // 72px (three 20px sliders @ 24px stride) + 4px margin
         int selectedColor = getColor(selectedColorIndex);
         String selectedHex = selectedColor < 0
                 ? COLOR_LABELS[selectedColorIndex] + ": auto"
@@ -327,7 +327,7 @@ public class VisualTab extends EditorTab {
         context.drawText(tr, selectedHex, x + 10, hexLabelY, 0xFF888888, false);
 
         // ── Weather section ───────────────────────────────────────────────────
-        int weatherBtnY = sliderY + 99;
+        int weatherBtnY = sliderY + 121;
         int weatherLabelY = weatherBtnY - 14; // "Precipitation:" label, one text row above buttons
         context.drawText(tr, "Precipitation:", x + 10, weatherLabelY, 0xFFAAAAAA, false);
 

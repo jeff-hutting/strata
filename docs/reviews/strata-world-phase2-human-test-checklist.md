@@ -29,7 +29,7 @@ _Check off each item in-game before closing the phase._
 
 ## Wand — Editor Open
 
-- [ ] Right-clicking in open air opens the Biome Editor screen
+- [x] Right-clicking in open air opens the Biome Editor screen
 - [x] All five tabs are visible and navigable: **Visual**, **Terrain**, **Features**, **Spawns**, **Export**
 - [ ] Display name field in header is editable inline (click pencil icon)
 - [ ] Auto-derived biome ID updates when display name changes

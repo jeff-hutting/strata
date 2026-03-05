@@ -11,9 +11,13 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.rendering.v1.ColorProviderRegistry;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.WorldSavePath;
+import net.minecraft.world.biome.FoliageColors;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
@@ -86,6 +90,26 @@ public class StrataWorldClient implements ClientModInitializer {
             }
         });
 
+        // Auto-restore session on world join: if a draft exists from a previous session,
+        // open the BiomeEditorSession immediately so the mixin overrides are active from
+        // the very first frame. Schedule a worldRenderer.reload() after a short delay to
+        // rebake chunk meshes with the custom colors once the world is fully loaded.
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            client.execute(() -> {
+                Path draftPath = getDraftPath(client);
+                if (draftPath != null && Files.exists(draftPath)) {
+                    BiomeEditorState restored = BiomeEditorState.loadDraft(draftPath);
+                    if (restored != null) {
+                        BiomeEditorSession.open(restored);
+                        StrataLogger.debug("Auto-restored BiomeEditorSession from draft on world join: {}", draftPath);
+                        // Defer the chunk reload by ~40 ticks (~2 seconds) to let the world
+                        // renderer initialize fully before requesting a mesh rebuild.
+                        scheduleChunkReload(client, 40);
+                    }
+                }
+            });
+        });
+
         // Client tick handler: drives PreviewZoneManager debounce timers.
         // Fires every client tick (~20 Hz). When no editor is open, getPreviewZoneManager()
         // returns null and we skip immediately, so there is no per-tick overhead.
@@ -94,15 +118,72 @@ public class StrataWorldClient implements ClientModInitializer {
             if (pzm != null) {
                 pzm.tick();
             }
+            tickChunkReloadCountdown(client);
         });
 
         // Undo/redo keybindings (Ctrl+Z / Ctrl+Y) are handled directly in
         // BiomeEditorScreen.keyPressed() — no global KeyBinding registration needed.
 
+        // ── Block color overrides for birch & spruce leaves ──────────────────
+        // Vanilla registers hardcoded color providers for birch (FoliageColors.BIRCH)
+        // and spruce (FoliageColors.SPRUCE) leaves in BlockColors.create(). These bypass
+        // Biome.getFoliageColor() entirely, so our BiomeMixin doesn't affect them.
+        // Re-registering via Fabric's ColorProviderRegistry replaces the vanilla provider
+        // with one that checks the editor session first.
+        ColorProviderRegistry.BLOCK.register((state, world, pos, tintIndex) -> {
+            BiomeEditorState session = BiomeEditorSession.getActive();
+            if (session != null && session.getFoliageColor() != -1) {
+                return session.getFoliageColor();
+            }
+            return FoliageColors.BIRCH;
+        }, Blocks.BIRCH_LEAVES);
+
+        ColorProviderRegistry.BLOCK.register((state, world, pos, tintIndex) -> {
+            BiomeEditorState session = BiomeEditorSession.getActive();
+            if (session != null && session.getFoliageColor() != -1) {
+                return session.getFoliageColor();
+            }
+            return FoliageColors.SPRUCE;
+        }, Blocks.SPRUCE_LEAVES);
+
+        ColorProviderRegistry.BLOCK.register((state, world, pos, tintIndex) -> {
+            BiomeEditorState session = BiomeEditorSession.getActive();
+            if (session != null && session.getFoliageColor() != -1) {
+                return session.getFoliageColor();
+            }
+            return FoliageColors.MANGROVE;
+        }, Blocks.MANGROVE_LEAVES);
+
         StrataLogger.debug("strata-world client initialized.");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Countdown for deferred chunk reload on session restore. -1 = inactive. */
+    private static int chunkReloadCountdown = -1;
+
+    /**
+     * Schedules a worldRenderer.reload() after the given number of client ticks.
+     * Used on world join to rebake chunk meshes once the renderer is fully ready.
+     */
+    private static void scheduleChunkReload(MinecraftClient client, int delayTicks) {
+        chunkReloadCountdown = delayTicks;
+    }
+
+    /**
+     * Called from the tick handler to count down and fire the deferred reload.
+     */
+    private static void tickChunkReloadCountdown(MinecraftClient client) {
+        if (chunkReloadCountdown > 0) {
+            chunkReloadCountdown--;
+        } else if (chunkReloadCountdown == 0) {
+            chunkReloadCountdown = -1;
+            if (client.worldRenderer != null) {
+                client.worldRenderer.reload();
+                StrataLogger.debug("Deferred chunk reload triggered for session restore.");
+            }
+        }
+    }
 
     /**
      * Returns the path to the session draft file for the current world or server.

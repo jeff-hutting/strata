@@ -11,6 +11,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.Selectable;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.text.Text;
@@ -45,6 +46,9 @@ public class BiomeEditorScreen extends Screen {
     private final List<EditorTab> tabs;
     private int activeTabIndex = 0;
 
+    /** Editable display name in the header bar. */
+    private TextFieldWidget displayNameField;
+
     /**
      * Creates a new BiomeEditorScreen with the given editor state.
      *
@@ -75,10 +79,28 @@ public class BiomeEditorScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        // TODO: Initialize header bar widgets (display name field, biome ID label, buttons)
-        // TODO: Initialize tab sidebar buttons
+
+        // ── Header bar: editable display name field ──────────────────────────
+        displayNameField = new TextFieldWidget(
+                textRenderer,
+                TAB_SIDEBAR_WIDTH + 8, 6, Math.min(width - TAB_SIDEBAR_WIDTH - 20, 200), 16,
+                Text.literal("Biome display name"));
+        displayNameField.setMaxLength(64);
+        displayNameField.setText(state.getDisplayName().isEmpty() ? "" : state.getDisplayName());
+        displayNameField.setPlaceholder(Text.literal("Untitled Biome"));
+        displayNameField.setDrawsBackground(false);
+        // When the field loses focus or Enter is pressed, update the display name & biome ID
+        displayNameField.setChangedListener(text -> {
+            String stripped = text.strip();
+            if (!stripped.equals(state.getDisplayName())) {
+                state.setDisplayName(stripped);
+            }
+        });
+        addDrawableChild(displayNameField);
+
         // TODO: Add Load button to header bar — triggers loadBiome() with a file picker
-        // TODO: Initialize active tab content
+        // TODO: Initialize tab sidebar buttons as proper ButtonWidget instances
+
         initActiveTab();
     }
 
@@ -150,14 +172,17 @@ public class BiomeEditorScreen extends Screen {
     }
 
     private void renderHeader(DrawContext context, int mouseX, int mouseY) {
-        // TODO: Render display name (editable), biome ID, action buttons
-        // Placeholder: draw display name text
-        // Colors are ARGB — 0xFFFFFFFF is opaque white, 0xFFAAAAAA is opaque light-gray.
-        String displayName = state.getDisplayName().isEmpty() ? "Untitled Biome" : state.getDisplayName();
-        context.drawText(textRenderer, displayName, TAB_SIDEBAR_WIDTH + 10, 10, 0xFFFFFFFF, true);
-
+        // The display name is rendered by the TextFieldWidget (added in init()).
+        // Below the field, show the auto-derived biome ID.
         String biomeId = state.getBiomeId().isEmpty() ? "strata_world:untitled" : state.getBiomeId();
-        context.drawText(textRenderer, biomeId, TAB_SIDEBAR_WIDTH + 10, 24, 0xFFAAAAAA, false);
+        context.drawText(textRenderer, biomeId, TAB_SIDEBAR_WIDTH + 10, 26, 0xFFAAAAAA, false);
+
+        // Unsaved/unexported indicator on the right side of the header
+        if (!state.isExported() && state.isDirty()) {
+            context.drawText(textRenderer, "\u25CF Unsaved", width - 70, 10, 0xFFFFAA00, false);
+        } else if (state.isExported()) {
+            context.drawText(textRenderer, "\u2713 Exported", width - 70, 10, 0xFF44FF44, false);
+        }
     }
 
     private void renderTabSidebar(DrawContext context, int mouseX, int mouseY) {

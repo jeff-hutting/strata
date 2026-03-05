@@ -37,7 +37,7 @@ public class TerrainTab extends EditorTab {
     };
 
     /** Vertical stride between slider rows in pixels. */
-    private static final int ROW_STRIDE = 28;
+    private static final int ROW_STRIDE = 30;
 
     private NoiseSlider[] sliders;
     private boolean autoRefresh = true;
@@ -100,7 +100,7 @@ public class TerrainTab extends EditorTab {
         private final int paramIndex;
 
         NoiseSlider(int x, int y, int width, int paramIndex, double initialValue) {
-            super(x, y, width, 14, Text.empty(), initialValue);
+            super(x, y, width, 20, Text.empty(), initialValue);
             this.paramIndex = paramIndex;
             updateMessage();
         }
