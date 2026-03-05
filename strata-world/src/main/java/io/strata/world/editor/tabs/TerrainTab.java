@@ -160,6 +160,32 @@ public class TerrainTab extends EditorTab {
             autoRefresh = !autoRefresh;
             b.setMessage(Text.literal(autoRefresh ? "Auto: ON" : "Auto: OFF"));
         }).dimensions(x + 126, btnY, 70, 16).build());
+
+        // Biome Blending toggle
+        PreviewZoneManager blendPzm = BiomeEditorSession.getPreviewZoneManager();
+        boolean blendInit = blendPzm != null && blendPzm.isBiomeBlendingEnabled();
+        screen.addTabWidget(ButtonWidget.builder(
+                Text.literal(blendInit ? "Blending: ON" : "Blending: OFF"), b -> {
+            PreviewZoneManager p = BiomeEditorSession.getPreviewZoneManager();
+            if (p != null) {
+                p.setBiomeBlendingEnabled(!p.isBiomeBlendingEnabled());
+                b.setMessage(Text.literal(p.isBiomeBlendingEnabled() ? "Blending: ON" : "Blending: OFF"));
+            }
+        }).dimensions(x + 10, btnY + 22, 110, 16).build());
+
+        // Reset World button
+        screen.addTabWidget(ButtonWidget.builder(Text.literal("Reset World"), b -> {
+            // Show confirmation by changing button text; second click executes
+            if (b.getMessage().getString().equals("Confirm Reset?")) {
+                PreviewZoneManager p = BiomeEditorSession.getPreviewZoneManager();
+                if (p != null) {
+                    p.resetWorld();
+                }
+                b.setMessage(Text.literal("Reset World"));
+            } else {
+                b.setMessage(Text.literal("Confirm Reset?"));
+            }
+        }).dimensions(x + 126, btnY + 22, 110, 16).build());
     }
 
     // ── Render ───────────────────────────────────────────────────────────────

@@ -4,8 +4,12 @@ import io.strata.core.config.StrataConfigHelper;
 import io.strata.core.util.StrataLogger;
 import io.strata.world.config.WorldConfig;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.WorldSavePath;
+
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * Manages debounced chunk regeneration for the Biome Editor preview zone.
@@ -83,6 +87,13 @@ public class PreviewZoneManager {
             }
         }
 
+        // Clear regenerating indicator after minimum display duration
+        if (regenerating && regenStartTime > 0
+                && now - regenStartTime >= REGEN_INDICATOR_MIN_MS) {
+            regenerating = false;
+            regenStartTime = -1;
+        }
+
         // Check Layer 1 debounce — capture undo snapshot
         if (lastLayer1ChangeTime > 0) {
             if (now - lastLayer1ChangeTime >= config.editorLayer1DebounceMs) {
@@ -94,12 +105,22 @@ public class PreviewZoneManager {
     }
 
     /**
+     * Timestamp when regeneration started, used to show "Refreshing preview..."
+     * for a minimum visible duration (1 second). -1 when not regenerating.
+     */
+    private long regenStartTime = -1;
+
+    /** Minimum duration to show the "Refreshing preview..." indicator (ms). */
+    private static final long REGEN_INDICATOR_MIN_MS = 1000L;
+
+    /**
      * Triggers chunk regeneration of the preview zone.
      * Captures an undo snapshot before regeneration.
      */
     private void triggerRegeneration() {
         undoManager.captureSnapshot(state);
         regenerating = true;
+        regenStartTime = System.currentTimeMillis();
 
         StrataLogger.debug("Starting preview zone regeneration (render distance: {} chunks)",
                 getRenderDistance());
@@ -114,8 +135,6 @@ public class PreviewZoneManager {
             mc.worldRenderer.reload();
             StrataLogger.debug("Triggered worldRenderer.reload() for preview refresh");
         }
-
-        regenerating = false;
     }
 
     /**
@@ -135,10 +154,30 @@ public class PreviewZoneManager {
     public void resetWorld() {
         StrataLogger.info("Resetting Design World — clearing region files and regenerating");
 
-        // TODO: Implement world reset
-        // 1. Delete all region files in the world save
-        // 2. Regenerate all chunks within render distance
-        // 3. Reset player position to spawn
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.getServer() == null) return;
+
+        // Delete overworld region files so chunks regenerate fresh
+        Path worldRoot = mc.getServer().getSavePath(WorldSavePath.ROOT);
+        Path regionDir = worldRoot.resolve("region");
+        if (Files.isDirectory(regionDir)) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(regionDir, "*.mca")) {
+                for (Path regionFile : stream) {
+                    Files.deleteIfExists(regionFile);
+                }
+                StrataLogger.info("Deleted region files from {}", regionDir);
+            } catch (IOException e) {
+                StrataLogger.error("Failed to delete region files: {}", e.getMessage());
+            }
+        }
+
+        // Trigger a full chunk reload to regenerate terrain
+        if (mc.worldRenderer != null) {
+            mc.worldRenderer.reload();
+        }
+
+        regenerating = true;
+        regenStartTime = System.currentTimeMillis();
     }
 
     /**
