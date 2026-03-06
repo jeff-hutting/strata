@@ -82,7 +82,7 @@ Status key:
 - [x] Reset World button appears in the editor toolbar
 - [x] Clicking it triggers a confirmation prompt before any action
 - [ ] Confirming clears terrain and regenerates using the current biome parameters
-      NOTE (code fix applied): `resetWorld()` now deletes all `.mca` region files, then teleports the player 5 000 blocks away so the server evicts all non-spawn chunks from its in-memory cache (~7.5 s at 20 Hz). Once evicted, the player is teleported back and fresh chunks generate with the current features/spawns via `BiomeGenerationMixin`. Known limitation: spawn chunks (within ~80 blocks of the world origin) are kept loaded by the server regardless — those chunks may not regenerate until the world is closed and reopened. Needs re-test.
+      NOTE (code fix applied): `resetWorld()` now uses the SERVER_STOPPED pattern — disconnects (triggering the server's final `saveAll()`), then `StrataWorld.SERVER_STOPPED` deletes all `.mca` files *after* the final save completes. Fresh chunks regenerate via `BiomeGenerationMixin` when the player reopens the world. The player lands on the world-select screen after confirm. Needs re-test.
 - [x] Cancelling leaves the world unchanged
 
 ---
@@ -111,9 +111,9 @@ Status key:
 ## Open Items — Features & Spawns Tabs
 
 - [ ] Entity search dropdown shows all available entities (scrollable)
-      NOTE (code fix applied): Dropdown fetches up to 500 results from `ENTITY_TYPE` registry filtered by query. Shows 8 at a time with keyboard navigation (↑/↓ to scroll, Tab/Enter to autocomplete, Escape to dismiss). Blue border at bottom indicates more entries below. Needs re-test.
+      NOTE (code fix applied): Dropdown fetches up to 500 results from `ENTITY_TYPE` registry filtered by query. Shows 8 at a time with keyboard navigation (↑/↓ to scroll, Tab/Enter to autocomplete, Escape to dismiss, PageUp/PageDown to jump 8 at a time, scroll wheel). Blue border at bottom indicates more entries below. Needs re-test.
 - [ ] Feature search dropdown shows all available placed features (scrollable)
-      NOTE (code fix applied): Same as Entity field — 500-result pool, 8 visible, keyboard-scrollable window. Needs re-test.
+      NOTE (code fix applied): Same as Entity field — 500-result pool, 8 visible, keyboard-scrollable window with PageUp/PageDown and scroll wheel. Needs re-test.
 
 ---
 
@@ -124,7 +124,7 @@ Status key:
 - [ ] Biome Blending "Enabled" mode
       NOTE (deferred): See Biome Blending Toggle section above.
 - [ ] Spawn chunks do not regenerate on Reset World
-      NOTE (known limitation): Minecraft always keeps spawn chunks (~80-block radius around the world origin) loaded. After Reset World, those chunks use the old baked data until the world is closed and reopened. One future mitigation: set the world spawn point far from the origin (e.g., 10 000 blocks away) on first world creation so spawn chunks are in an uninhabited area.
+      NOTE (resolved by SERVER_STOPPED pattern): Because Reset World now disconnects before deleting files, the server fully stops and completes its final save before any files are removed. All chunks — including spawn chunks — are deleted and regenerated fresh when the player reopens the world from the world-select screen. Needs re-test.
 
 ---
 
