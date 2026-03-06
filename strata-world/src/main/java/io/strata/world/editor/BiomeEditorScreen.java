@@ -261,6 +261,16 @@ public class BiomeEditorScreen extends Screen {
         return super.mouseClicked(click, doubleClick);
     }
 
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (activeTabIndex >= 0 && activeTabIndex < tabs.size()) {
+            if (tabs.get(activeTabIndex).mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) {
+                return true;
+            }
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
     /**
      * Handles keyboard input.
      *

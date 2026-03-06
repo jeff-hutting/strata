@@ -217,6 +217,20 @@ public class FeaturesTab extends EditorTab {
                 return true;
             }
         }
+        if (key == GLFW.GLFW_KEY_PAGE_DOWN) {
+            selectedSuggestion = Math.min(selectedSuggestion + MAX_VISIBLE_SUGGESTIONS, suggestions.size() - 1);
+            if (selectedSuggestion >= suggestionScrollOffset + MAX_VISIBLE_SUGGESTIONS) {
+                suggestionScrollOffset = selectedSuggestion - MAX_VISIBLE_SUGGESTIONS + 1;
+            }
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_PAGE_UP) {
+            selectedSuggestion = Math.max(selectedSuggestion - MAX_VISIBLE_SUGGESTIONS, 0);
+            if (selectedSuggestion < suggestionScrollOffset) {
+                suggestionScrollOffset = selectedSuggestion;
+            }
+            return true;
+        }
         if (key == GLFW.GLFW_KEY_ESCAPE) {
             suggestions = List.of();
             selectedSuggestion = -1;
@@ -224,6 +238,20 @@ public class FeaturesTab extends EditorTab {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (addField == null || !addField.isFocused() || suggestions.isEmpty()) {
+            return false;
+        }
+        // verticalAmount > 0 = scroll up (show earlier entries)
+        int delta = verticalAmount > 0 ? -1 : 1;
+        suggestionScrollOffset = Math.max(0,
+                Math.min(suggestionScrollOffset + delta, suggestions.size() - MAX_VISIBLE_SUGGESTIONS));
+        selectedSuggestion = Math.max(suggestionScrollOffset,
+                Math.min(selectedSuggestion, suggestionScrollOffset + MAX_VISIBLE_SUGGESTIONS - 1));
+        return true;
     }
 
     // ── Render ───────────────────────────────────────────────────────────────

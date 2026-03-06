@@ -74,4 +74,17 @@ public abstract class EditorTab {
     public boolean keyPressed(KeyInput keyInput) {
         return false;
     }
+
+    /**
+     * Handles a mouse scroll in the content area.
+     *
+     * @param mouseX           cursor X
+     * @param mouseY           cursor Y
+     * @param horizontalAmount horizontal scroll delta
+     * @param verticalAmount   vertical scroll delta (positive = scroll up)
+     * @return {@code true} if the scroll was consumed; {@code false} to pass it on
+     */
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        return false;
+    }
 }
