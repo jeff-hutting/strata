@@ -9,9 +9,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.WorldSavePath;
 
-import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
@@ -222,17 +219,25 @@ public class PreviewZoneManager {
         MinecraftServer server = mc.getServer();
         if (server == null) return;
 
-        // Schedule region-file deletion BEFORE disconnecting so the SERVER_STOPPED
-        // handler in StrataWorld always finds the path, even if the server stops
-        // before the server-thread lambda below has a chance to run.
-        // getSavePath() only reads a stored Path — safe to call from the render thread.
+        // Schedule region-file deletion before the server stops.
+        // getSavePath() only reads a stored Path — safe from the render thread.
         Path regionDir = server.getSavePath(WorldSavePath.ROOT).resolve("region");
         BiomeEditorSession.setPendingWorldReset(regionDir);
 
-        // Best-effort: push the latest dynamic features/spawns to the server so
-        // they are available if the player triggers a Refresh Preview before Reset World.
-        // These do NOT affect the fresh chunks generated after the world is reopened;
-        // those are driven by the draft state loaded when the editor is next opened.
+        // Stop the server from the server thread.
+        //
+        // We intentionally do NOT call mc.disconnect() from the render thread.
+        // In MC 1.21.11, mc.disconnect(Screen, boolean) spins on the render thread
+        // calling render() until server.isStopping() becomes true. In this context
+        // (integrated server with shouldPause()=false), isStopping() never becomes
+        // true and the game hangs indefinitely.
+        //
+        // Instead: server.stop(false) sets running=false on the server thread and
+        // returns immediately. The server finishes its current tick, runs its shutdown
+        // sequence (saveAll, SERVER_STOPPING, SERVER_STOPPED), then closes the network
+        // connection. The client detects the lost connection through its own network
+        // handler and performs the disconnect/screen-switch without any render-thread
+        // blocking.
         server.execute(() -> {
             initBiomeOverrideIfNeeded(server);
             ServerWorld overworld = server.getOverworld();
@@ -240,23 +245,10 @@ public class PreviewZoneManager {
                 BiomeEditorSession.updateDynamicFeatures(overworld, state.getFeatures());
                 BiomeEditorSession.updateDynamicSpawnSettings(state.getSpawnEntries());
             }
+            server.stop(false);
         });
-
-        // Disconnect directly from this (render) thread.
-        //
-        // IMPORTANT: Do NOT call mc.disconnect() via mc.execute() from inside
-        // server.execute() — that nesting deadlocks because mc.disconnect() blocks
-        // the render thread waiting for the server to stop, while the server's stop
-        // sequence posts cleanup tasks back to the render thread via mc.execute(),
-        // and neither side can make progress.
-        //
-        // Calling disconnect() here (render thread, button-click call site) avoids
-        // that: the server is free to stop while the render thread is inside
-        // disconnect(), and no mc.execute() callbacks are outstanding.
-        mc.disconnect(
-                new net.minecraft.client.gui.screen.world.SelectWorldScreen(
-                        new net.minecraft.client.gui.screen.TitleScreen()),
-                false);
+        // Return immediately — render loop continues normally until the client
+        // detects the server has stopped and switches screens on its own.
     }
 
     /**
