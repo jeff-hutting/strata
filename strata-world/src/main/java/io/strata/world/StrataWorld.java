@@ -21,6 +21,11 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 /**
  * Entry point for the {@code strata-world} module.
  *
@@ -72,6 +77,24 @@ public class StrataWorld implements ModInitializer {
         // Clear the server biome override when the server stops to prevent stale references
         ServerLifecycleEvents.SERVER_STOPPING.register(server ->
                 BiomeEditorSession.clearServerBiomeOverride());
+
+        // Delete region files AFTER the server's final saveAll() completes.
+        // PreviewZoneManager.resetWorld() disconnects and sets a pending path; we consume it here.
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            Path regionDir = BiomeEditorSession.takePendingWorldReset();
+            if (regionDir != null && Files.isDirectory(regionDir)) {
+                try (DirectoryStream<Path> stream = Files.newDirectoryStream(regionDir, "*.mca")) {
+                    int deleted = 0;
+                    for (Path f : stream) {
+                        Files.deleteIfExists(f);
+                        deleted++;
+                    }
+                    StrataLogger.info("Reset World: deleted {} region file(s) from {}", deleted, regionDir);
+                } catch (IOException e) {
+                    StrataLogger.error("Reset World: failed to delete region files: {}", e.getMessage());
+                }
+            }
+        });
 
         // Issue #1 — Singleplayer enforcement: kick non-host players in a Biome Design World.
         // Biome Design Worlds are singleplayer-only per SPEC §7.0. Only the host player

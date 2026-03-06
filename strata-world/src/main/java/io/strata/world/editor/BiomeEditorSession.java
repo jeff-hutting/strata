@@ -65,6 +65,14 @@ public final class BiomeEditorSession {
     /** Cached dynamic spawn settings built from the editor's spawn entry list. */
     private static volatile SpawnSettings dynamicSpawnSettings = null;
 
+    /**
+     * Path to the overworld {@code region/} directory scheduled for deletion on
+     * the next {@code SERVER_STOPPED} event. Set by {@code PreviewZoneManager.resetWorld()},
+     * consumed by the {@code SERVER_STOPPED} handler in {@code StrataWorld}.
+     * {@code null} when no reset is pending.
+     */
+    private static volatile java.nio.file.Path pendingWorldReset = null;
+
     private BiomeEditorSession() {}
 
     // ── Session lifecycle ──────────────────────────────────────────────────
@@ -118,6 +126,24 @@ public final class BiomeEditorSession {
      */
     public static RegistryEntry<Biome> getServerBiomeOverride() {
         return serverBiomeOverride;
+    }
+
+    /**
+     * Schedules the given region directory for deletion when the server stops.
+     * Called by {@code PreviewZoneManager.resetWorld()} before disconnecting.
+     */
+    public static void setPendingWorldReset(java.nio.file.Path regionDir) {
+        pendingWorldReset = regionDir;
+    }
+
+    /**
+     * Returns and clears the pending reset path, or {@code null} if none.
+     * Called by the {@code SERVER_STOPPED} handler in {@code StrataWorld}.
+     */
+    public static java.nio.file.Path takePendingWorldReset() {
+        java.nio.file.Path p = pendingWorldReset;
+        pendingWorldReset = null;
+        return p;
     }
 
     /** Clears the server biome override and all dynamic settings. Called on server stop. */

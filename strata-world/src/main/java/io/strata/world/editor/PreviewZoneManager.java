@@ -59,13 +59,6 @@ public class PreviewZoneManager {
     /** Whether biome blending is enabled (deferred feature — no-op in current flat-world mode). */
     private boolean biomeBlendingEnabled = false;
 
-    // ── Reset World pending-respawn state ────────────────────────────────────
-    /** Client ticks remaining before teleporting the player back after a Reset World. -1 = idle. */
-    private int pendingRespawnCountdown = -1;
-    /** Target position for the respawn-back teleport after a Reset World. */
-    private double pendingRespawnX, pendingRespawnY, pendingRespawnZ;
-    private float pendingRespawnYaw, pendingRespawnPitch;
-
     /**
      * Creates a PreviewZoneManager for the given editor state and undo manager.
      *
@@ -123,8 +116,7 @@ public class PreviewZoneManager {
 
         // Clear regenerating indicator after minimum display duration
         if (regenerating && regenStartTime > 0
-                && now - regenStartTime >= REGEN_INDICATOR_MIN_MS
-                && pendingRespawnCountdown < 0) {
+                && now - regenStartTime >= REGEN_INDICATOR_MIN_MS) {
             regenerating = false;
             regenStartTime = -1;
         }
@@ -138,34 +130,6 @@ public class PreviewZoneManager {
             }
         }
 
-        // Reset World pending respawn: tick down, then teleport player back
-        if (pendingRespawnCountdown > 0) {
-            pendingRespawnCountdown--;
-        } else if (pendingRespawnCountdown == 0) {
-            pendingRespawnCountdown = -1;
-            MinecraftClient mc = MinecraftClient.getInstance();
-            MinecraftServer server = mc.getServer();
-            if (server != null && mc.player != null) {
-                server.execute(() -> {
-                    var serverPlayer = server.getPlayerManager().getPlayer(mc.player.getUuid());
-                    ServerWorld overworld = server.getOverworld();
-                    if (serverPlayer != null && overworld != null) {
-                        serverPlayer.teleport(overworld,
-                                pendingRespawnX, pendingRespawnY, pendingRespawnZ,
-                                java.util.Set.of(), pendingRespawnYaw, pendingRespawnPitch, true);
-                        StrataLogger.info("Reset World: teleported player back to origin");
-                    }
-                });
-                mc.execute(() -> {
-                    if (mc.worldRenderer != null) mc.worldRenderer.reload();
-                    regenerating = false;
-                    regenStartTime = -1;
-                });
-            } else {
-                regenerating = false;
-                regenStartTime = -1;
-            }
-        }
     }
 
     /**
@@ -230,34 +194,33 @@ public class PreviewZoneManager {
     }
 
     /**
-     * Resets the entire world — updates dynamic settings, deletes all region
-     * files, and forces a full chunk regeneration via the teleport-away/back
-     * technique.
+     * Resets the entire world — updates dynamic settings then disconnects so the
+     * server can complete its final save before region files are deleted.
      *
-     * <h3>Why teleport-away?</h3>
-     * <p>Minecraft keeps loaded chunks in an in-memory cache. Deleting {@code .mca}
-     * files alone does not evict already-loaded chunks — the server continues to use
-     * the cached data until the chunks naturally unload. Teleporting the player
-     * ~5 000 blocks away removes their player-load ticket from all nearby chunks,
-     * which causes the server to unload them over ≈150 ticks (~7.5 s). When the
-     * player is then teleported back, the server regenerates those chunks from
-     * scratch using the current dynamic generation settings (injected by
-     * {@link BiomeGenerationMixin}).
+     * <h3>Why disconnect?</h3>
+     * <p>Spawn chunks (within ~80 blocks of world spawn) are kept permanently
+     * loaded by the server and cannot be evicted while the server is running.
+     * Worse, calling {@code saveAll()} and then deleting {@code .mca} files is
+     * undone by the server's own final save on shutdown — it writes the still-in-
+     * memory chunk data back to disk.
      *
-     * <p><b>Limitation:</b> Spawn chunks (within ~5 chunks of the world spawn
-     * point, typically near the origin) are kept loaded by the server regardless
-     * of player position. After a reset, these chunks may not be regenerated until
-     * the world is closed and reopened.
+     * <p>The only reliable approach:
+     * <ol>
+     *   <li>Update dynamic settings so they survive the session restart.
+     *   <li>Disconnect — the server runs its final {@code saveAll()} and stops.
+     *   <li>{@code SERVER_STOPPED} fires (registered in {@code StrataWorld}) →
+     *       deletes region files <em>after</em> the final save has completed.
+     *   <li>The player sees the world-selection screen and clicks to reopen.
+     *   <li>Fresh chunks generate with the current dynamic settings via
+     *       {@link BiomeGenerationMixin}.
+     * </ol>
      */
     public void resetWorld() {
-        StrataLogger.info("Resetting Design World — clearing chunks, regenerating");
+        StrataLogger.info("Resetting Design World — will delete region files after server stops");
 
         MinecraftClient mc = MinecraftClient.getInstance();
         MinecraftServer server = mc.getServer();
         if (server == null) return;
-
-        regenerating = true;
-        regenStartTime = System.currentTimeMillis();
 
         server.execute(() -> {
             initBiomeOverrideIfNeeded(server);
@@ -267,51 +230,17 @@ public class PreviewZoneManager {
                 BiomeEditorSession.updateDynamicSpawnSettings(state.getSpawnEntries());
             }
 
-            // Save all world data before deleting region files
-            server.saveAll(false, true, true);
+            // Schedule region-file deletion for AFTER the server's final saveAll() completes.
+            // The SERVER_STOPPED handler in StrataWorld picks this up.
+            Path regionDir = server.getSavePath(WorldSavePath.ROOT).resolve("region");
+            BiomeEditorSession.setPendingWorldReset(regionDir);
 
-            // Delete overworld region files so all chunks regenerate fresh
-            Path worldRoot = server.getSavePath(WorldSavePath.ROOT);
-            Path regionDir = worldRoot.resolve("region");
-            if (Files.isDirectory(regionDir)) {
-                try (DirectoryStream<Path> stream = Files.newDirectoryStream(regionDir, "*.mca")) {
-                    for (Path regionFile : stream) {
-                        Files.deleteIfExists(regionFile);
-                    }
-                    StrataLogger.info("Deleted region files from {}", regionDir);
-                } catch (IOException e) {
-                    StrataLogger.error("Failed to delete region files: {}", e.getMessage());
-                }
-            }
-
-            // Teleport the player far away to force in-memory chunk eviction
-            var serverPlayer = mc.player != null
-                    ? server.getPlayerManager().getPlayer(mc.player.getUuid()) : null;
-            if (serverPlayer != null && overworld != null) {
-                // Store the original position for the teleport-back
-                pendingRespawnX = serverPlayer.getX();
-                pendingRespawnY = serverPlayer.getY();
-                pendingRespawnZ = serverPlayer.getZ();
-                pendingRespawnYaw = serverPlayer.getYaw();
-                pendingRespawnPitch = serverPlayer.getPitch();
-
-                // Teleport far away — removes player-load ticket from all nearby chunks
-                serverPlayer.teleport(overworld,
-                        5000.5, serverPlayer.getY(), 0.5,
-                        java.util.Set.of(), 0f, 0f, true);
-                StrataLogger.info("Reset World: teleported player to staging area; " +
-                        "waiting for chunk eviction (~150 ticks)");
-
-                // Schedule the teleport-back after 150 client ticks (~7.5 s)
-                mc.execute(() -> pendingRespawnCountdown = 150);
-            } else {
-                // No player in world — just reload renderer
-                mc.execute(() -> {
-                    if (mc.worldRenderer != null) mc.worldRenderer.reload();
-                    regenerating = false;
-                    regenStartTime = -1;
-                });
-            }
+            // Disconnect — server performs final save, then stops.
+            // SERVER_STOPPED fires → deletes .mca files → player reopens from world list.
+            mc.execute(() -> mc.disconnect(
+                    new net.minecraft.client.gui.screen.world.SelectWorldScreen(
+                            new net.minecraft.client.gui.screen.TitleScreen()),
+                    false));
         });
     }
 
