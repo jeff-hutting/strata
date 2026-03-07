@@ -27,19 +27,22 @@ import java.util.function.Supplier;
  *
  * <p>After {@link io.strata.world.editor.BiomeEditorSession} builds new dynamic
  * settings, it calls {@link #strata$setIndexedFeaturesListSupplier} to replace
- * the memoized supplier with a fresh one. The next {@code generateFeatures()}
- * call then recomputes the indexed list, which will now include the editor's
- * features (because the new supplier calls through
- * {@code generationSettingsGetter → Biome.getGenerationSettings()}, which is
- * intercepted by {@link BiomeGenerationMixin}).
+ * the memoized supplier with a fresh one. The new supplier's lambda short-circuits
+ * the {@code generationSettingsGetter} for the editor preview biome, injecting
+ * {@link io.strata.world.editor.BiomeEditorSession#dynamicGenerationSettings}
+ * directly — necessary because {@link net.minecraft.world.gen.chunk.FlatChunkGenerator}
+ * uses {@code FlatChunkGeneratorConfig::createGenerationSettings} as its getter,
+ * which reads <em>static</em> biome data and bypasses {@link BiomeGenerationMixin}.
  */
 @Mixin(ChunkGenerator.class)
 public interface ChunkGeneratorAccessor {
 
     /**
      * Returns the generation-settings getter stored on this chunk generator.
-     * For a flat world, this is {@code entry -> entry.value().getGenerationSettings()},
-     * which goes through {@link BiomeGenerationMixin}.
+     * <p><b>Caution:</b> For {@link net.minecraft.world.gen.chunk.FlatChunkGenerator}
+     * this is {@code FlatChunkGeneratorConfig::createGenerationSettings}, which reads
+     * static biome data and does NOT go through {@link BiomeGenerationMixin}.
+     * Callers must short-circuit at the call site for the editor preview biome.
      */
     @Accessor("generationSettingsGetter")
     Function<RegistryEntry<Biome>, GenerationSettings> strata$getGenerationSettingsGetter();

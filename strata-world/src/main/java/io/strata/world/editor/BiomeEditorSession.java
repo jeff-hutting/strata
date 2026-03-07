@@ -257,6 +257,17 @@ public final class BiomeEditorSession {
      * changes, because the old cached list does not include the new features
      * and they would be silently skipped at chunk-generation time.
      *
+     * <h3>Flat-world bypass</h3>
+     * <p>{@link net.minecraft.world.gen.chunk.FlatChunkGenerator} passes
+     * {@code FlatChunkGeneratorConfig::createGenerationSettings} as its
+     * {@code generationSettingsGetter}, which reads the biome's <em>static</em>
+     * registry-backed settings — it does NOT call {@code Biome.getGenerationSettings()},
+     * so {@link io.strata.world.mixin.BiomeGenerationMixin} is never invoked during
+     * indexed-list construction.  We therefore short-circuit the getter in the
+     * lambda: when the biome is the editor preview biome we return
+     * {@link #dynamicGenerationSettings} directly instead of delegating to the
+     * (bypassing) getter.
+     *
      * @param world the server world whose chunk generator to update
      */
     private static void invalidateIndexedFeaturesList(ServerWorld world) {
@@ -264,11 +275,27 @@ public final class BiomeEditorSession {
         ChunkGeneratorAccessor acc = (ChunkGeneratorAccessor) generator;
         var getter = acc.strata$getGenerationSettingsGetter();
         var biomes = List.copyOf(generator.getBiomeSource().getBiomes());
+
+        // Capture volatile fields once so the lambda closes over stable locals.
+        final Biome previewBiome = editorPreviewBiome;
+        final GenerationSettings dynSettings = dynamicGenerationSettings;
+
         acc.strata$setIndexedFeaturesListSupplier(
                 Suppliers.memoize(() ->
                         PlacedFeatureIndexer.collectIndexedFeatures(
                                 biomes,
-                                entry -> getter.apply(entry).getFeatures(),
+                                entry -> {
+                                    // FlatChunkGenerator's getter bypasses Biome.getGenerationSettings()
+                                    // (uses FlatChunkGeneratorConfig::createGenerationSettings instead),
+                                    // so BiomeGenerationMixin never fires here.  Inject dynamic settings
+                                    // directly for the editor preview biome.
+                                    if (previewBiome != null
+                                            && entry.value() == previewBiome
+                                            && dynSettings != null) {
+                                        return dynSettings.getFeatures();
+                                    }
+                                    return getter.apply(entry).getFeatures();
+                                },
                                 true)));
         StrataLogger.debug("Invalidated indexed features list for chunk generator");
     }
