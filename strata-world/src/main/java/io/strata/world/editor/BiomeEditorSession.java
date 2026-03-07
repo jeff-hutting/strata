@@ -1,6 +1,8 @@
 package io.strata.world.editor;
 
+import com.google.common.base.Suppliers;
 import io.strata.core.util.StrataLogger;
+import io.strata.world.mixin.ChunkGeneratorAccessor;
 import io.strata.world.mixin.GenerationSettingsAccessor;
 import net.minecraft.entity.SpawnGroup;
 import net.minecraft.registry.Registries;
@@ -13,7 +15,9 @@ import net.minecraft.util.Identifier;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.GenerationSettings;
 import net.minecraft.world.biome.SpawnSettings;
+import net.minecraft.world.gen.chunk.ChunkGenerator;
 import net.minecraft.world.gen.feature.PlacedFeature;
+import net.minecraft.world.gen.feature.util.PlacedFeatureIndexer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -238,6 +242,35 @@ public final class BiomeEditorSession {
 
         StrataLogger.debug("Updated dynamic generation settings ({} features at step {})",
                 entries.size(), VEGETAL_DECORATION_STEP);
+
+        // The chunk generator caches a sorted/deduplicated feature list in
+        // indexedFeaturesListSupplier (Guava memoize). This cache is pre-built
+        // by IntegratedServerLoader before SERVER_STARTING fires, so it never
+        // contains our dynamic features. Replace it with a fresh memoized
+        // supplier so the next generateFeatures() call includes our features.
+        invalidateIndexedFeaturesList(world);
+    }
+
+    /**
+     * Replaces the chunk generator's memoized indexed-features list supplier
+     * with a fresh one. Must be called after {@link #dynamicGenerationSettings}
+     * changes, because the old cached list does not include the new features
+     * and they would be silently skipped at chunk-generation time.
+     *
+     * @param world the server world whose chunk generator to update
+     */
+    private static void invalidateIndexedFeaturesList(ServerWorld world) {
+        ChunkGenerator generator = world.getChunkManager().getChunkGenerator();
+        ChunkGeneratorAccessor acc = (ChunkGeneratorAccessor) generator;
+        var getter = acc.strata$getGenerationSettingsGetter();
+        var biomes = List.copyOf(generator.getBiomeSource().getBiomes());
+        acc.strata$setIndexedFeaturesListSupplier(
+                Suppliers.memoize(() ->
+                        PlacedFeatureIndexer.collectIndexedFeatures(
+                                biomes,
+                                entry -> getter.apply(entry).getFeatures(),
+                                true)));
+        StrataLogger.debug("Invalidated indexed features list for chunk generator");
     }
 
     /**

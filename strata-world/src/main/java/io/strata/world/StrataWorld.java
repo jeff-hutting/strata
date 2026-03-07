@@ -8,6 +8,7 @@ import io.strata.world.biome.StrataBiomes;
 import io.strata.world.config.WorldConfig;
 import io.strata.world.editor.BiomeDesignWorldPreset;
 import io.strata.world.editor.BiomeEditorSession;
+import io.strata.world.editor.BiomeEditorState;
 import io.strata.world.editor.BiomeEditorWandHandler;
 import io.strata.world.editor.StrataWand;
 import io.strata.world.network.BiomeSamplePayload;
@@ -19,7 +20,10 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemStack;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
+import net.minecraft.util.WorldSavePath;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -73,6 +77,43 @@ public class StrataWorld implements ModInitializer {
         // This ensures isCurrentWorldBiomeDesignWorld() never reads level.dat on the hot path,
         // and that INFO-level logs in cacheWorldType() always appear in latest.log for debugging.
         ServerLifecycleEvents.SERVER_STARTING.register(BiomeDesignWorldPreset::cacheWorldType);
+
+        // Eagerly initialize the editor preview biome override and dynamic settings from the
+        // saved draft at SERVER_STARTED — after the registry is fully set up but before any
+        // player joins. This ensures that features and spawns defined in the draft appear in
+        // all newly generated chunks (non-spawn chunks explored after joining). Without this,
+        // editorPreviewBiome is null during chunk generation and BiomeGenerationMixin is a no-op.
+        //
+        // Spawn chunks (~80 blocks of world spawn) are a known limitation: they are generated
+        // by prepareStartRegion() BEFORE SERVER_STARTED fires, so they will not have custom
+        // features until the player uses Reset World and walks away from spawn.
+        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            if (!BiomeDesignWorldPreset.isCurrentWorldBiomeDesignWorld(server)) return;
+            ServerWorld overworld = server.getOverworld();
+            if (overworld == null) return;
+
+            // Set editorPreviewBiome from the server's biome registry
+            overworld.getRegistryManager()
+                    .getOptional(RegistryKeys.BIOME)
+                    .flatMap(reg -> reg.getOptional(BiomeEditorSession.EDITOR_PREVIEW_KEY))
+                    .ifPresent(entry -> {
+                        BiomeEditorSession.setServerBiomeOverride(entry);
+                        StrataLogger.info("SERVER_STARTED: initialized editor_preview biome override");
+                    });
+
+            // Load dynamic features and spawns from the saved draft
+            Path draftPath = server.getSavePath(WorldSavePath.ROOT)
+                    .resolve("strata_biomes").resolve("_session.draft.json");
+            BiomeEditorState draft = BiomeEditorState.loadDraft(draftPath);
+            if (draft != null) {
+                BiomeEditorSession.updateDynamicFeatures(overworld, draft.getFeatures());
+                BiomeEditorSession.updateDynamicSpawnSettings(draft.getSpawnEntries());
+                StrataLogger.info("SERVER_STARTED: loaded {} feature(s) and {} spawn entry/entries from draft",
+                        draft.getFeatures().size(), draft.getSpawnEntries().size());
+            } else {
+                StrataLogger.info("SERVER_STARTED: no draft file found — dynamic settings left empty");
+            }
+        });
 
         // Clear the server biome override when the server stops to prevent stale references
         ServerLifecycleEvents.SERVER_STOPPING.register(server ->
