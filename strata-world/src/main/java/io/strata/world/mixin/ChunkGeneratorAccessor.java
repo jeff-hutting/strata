@@ -48,6 +48,20 @@ public interface ChunkGeneratorAccessor {
     Function<RegistryEntry<Biome>, GenerationSettings> strata$getGenerationSettingsGetter();
 
     /**
+     * Replaces the generation-settings getter.
+     *
+     * <p>Used to inject a wrapper that returns
+     * {@link io.strata.world.editor.BiomeEditorSession#dynamicGenerationSettings}
+     * for the editor preview biome, bypassing the flat-world getter
+     * ({@code FlatChunkGeneratorConfig::createGenerationSettings}) which reads
+     * static registry data and would otherwise prevent our dynamic features from
+     * being recognised as "enabled" inside {@code ChunkGenerator.generateFeatures}.
+     */
+    @Accessor("generationSettingsGetter")
+    void strata$setGenerationSettingsGetter(
+            Function<RegistryEntry<Biome>, GenerationSettings> getter);
+
+    /**
      * Replaces the memoized indexed-features supplier.
      * Callers should supply a fresh {@code Suppliers.memoize(…)} so the new
      * list is built lazily on the next {@code generateFeatures()} call.

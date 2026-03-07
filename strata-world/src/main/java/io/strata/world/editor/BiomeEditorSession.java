@@ -21,6 +21,7 @@ import net.minecraft.world.gen.feature.util.PlacedFeatureIndexer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Singleton that tracks the active Biome Editor session.
@@ -65,6 +66,15 @@ public final class BiomeEditorSession {
 
     /** Cached dynamic generation settings built from the editor's feature list. */
     private static volatile GenerationSettings dynamicGenerationSettings = null;
+
+    /**
+     * The original {@code generationSettingsGetter} stored on the chunk generator,
+     * captured the first time {@link #invalidateIndexedFeaturesList} runs.
+     * Kept so subsequent calls always wrap the true original rather than
+     * double-wrapping a previously installed wrapper.
+     * Cleared on server stop by {@link #clearServerBiomeOverride()}.
+     */
+    private static volatile Function<RegistryEntry<Biome>, GenerationSettings> originalGenerationSettingsGetter = null;
 
     /** Cached dynamic spawn settings built from the editor's spawn entry list. */
     private static volatile SpawnSettings dynamicSpawnSettings = null;
@@ -156,6 +166,7 @@ public final class BiomeEditorSession {
         editorPreviewBiome = null;
         dynamicGenerationSettings = null;
         dynamicSpawnSettings = null;
+        originalGenerationSettingsGetter = null;
     }
 
     // ── Dynamic generation settings ────────────────────────────────────────
@@ -274,9 +285,44 @@ public final class BiomeEditorSession {
         ChunkGenerator generator = world.getChunkManager().getChunkGenerator();
         ChunkGeneratorAccessor acc = (ChunkGeneratorAccessor) generator;
         var getter = acc.strata$getGenerationSettingsGetter();
+
+        // ── Step 1: patch generationSettingsGetter ────────────────────────────
+        //
+        // ChunkGenerator.generateFeatures() calls generationSettingsGetter.apply(biome)
+        // for every biome in the chunk to build an IntSet of "enabled" feature indices.
+        // Only features whose index appears in that set are actually placed.
+        //
+        // For FlatChunkGenerator the getter is FlatChunkGeneratorConfig::createGenerationSettings,
+        // which reads the biome's *static* registry-backed settings — it never goes through
+        // Biome.getGenerationSettings() or BiomeGenerationMixin, so our dynamic step-9
+        // features are never marked as enabled and are silently skipped.
+        //
+        // We store the original getter once (to avoid double-wrapping on repeated calls)
+        // and replace it with a wrapper that returns dynamicGenerationSettings directly
+        // for the editor preview biome.  The wrapper reads volatile fields on every
+        // call so it always reflects the current state without needing replacement.
+        if (originalGenerationSettingsGetter == null) {
+            originalGenerationSettingsGetter = getter;
+        }
+        final Function<RegistryEntry<Biome>, GenerationSettings> baseGetter = originalGenerationSettingsGetter;
+        acc.strata$setGenerationSettingsGetter(entry -> {
+            Biome preview = editorPreviewBiome;
+            GenerationSettings current = dynamicGenerationSettings;
+            if (preview != null && entry.value() == preview && current != null) {
+                return current;
+            }
+            return baseGetter.apply(entry);
+        });
+
+        // ── Step 2: rebuild indexedFeaturesListSupplier ───────────────────────
+        //
+        // The memoized indexed list was pre-built before our dynamic settings existed.
+        // Replace it with a fresh supplier that also short-circuits to dynamicGenerationSettings
+        // for the preview biome (necessary because the memoized supplier also uses the
+        // flat-world getter internally during collectIndexedFeatures).
         var biomes = List.copyOf(generator.getBiomeSource().getBiomes());
 
-        // Capture volatile fields once so the lambda closes over stable locals.
+        // Capture volatile fields once so the memoized lambda closes over stable locals.
         final Biome previewBiome = editorPreviewBiome;
         final GenerationSettings dynSettings = dynamicGenerationSettings;
 
@@ -285,19 +331,16 @@ public final class BiomeEditorSession {
                         PlacedFeatureIndexer.collectIndexedFeatures(
                                 biomes,
                                 entry -> {
-                                    // FlatChunkGenerator's getter bypasses Biome.getGenerationSettings()
-                                    // (uses FlatChunkGeneratorConfig::createGenerationSettings instead),
-                                    // so BiomeGenerationMixin never fires here.  Inject dynamic settings
-                                    // directly for the editor preview biome.
                                     if (previewBiome != null
                                             && entry.value() == previewBiome
                                             && dynSettings != null) {
                                         return dynSettings.getFeatures();
                                     }
-                                    return getter.apply(entry).getFeatures();
+                                    return baseGetter.apply(entry).getFeatures();
                                 },
                                 true)));
-        StrataLogger.debug("Invalidated indexed features list for chunk generator");
+
+        StrataLogger.debug("Patched generationSettingsGetter and invalidated indexed features list");
     }
 
     /**

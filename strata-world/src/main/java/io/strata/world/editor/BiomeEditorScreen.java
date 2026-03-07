@@ -11,14 +11,20 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.Selectable;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.text.Text;
+import net.minecraft.util.WorldSavePath;
 import org.lwjgl.glfw.GLFW;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Full-screen Biome Editor panel using Fabric's Screen API.
@@ -42,12 +48,30 @@ public class BiomeEditorScreen extends Screen {
     /** Height of the header bar in pixels. */
     private static final int HEADER_HEIGHT = 40;
 
+    /** Row height for entries in the Load biome picker dropdown. */
+    private static final int LOAD_PICKER_ROW_H = 14;
+
+    /** Maximum rows visible in the Load biome picker before scrolling. */
+    private static final int LOAD_PICKER_MAX_VISIBLE = 10;
+
     private final BiomeEditorState state;
     private final List<EditorTab> tabs;
     private int activeTabIndex = 0;
 
     /** Editable display name in the header bar. */
     private TextFieldWidget displayNameField;
+
+    /**
+     * When non-null, a list of saved-biome JSON paths is shown as a dropdown
+     * picker anchored below the Load button.
+     */
+    private List<Path> loadPickerPaths = null;
+
+    /** Scroll offset into {@link #loadPickerPaths}. */
+    private int loadPickerScroll = 0;
+
+    /** {@code true} when the Reset World button in the header is waiting for a second click. */
+    private boolean resetConfirmPending = false;
 
     /**
      * Creates a new BiomeEditorScreen with the given editor state.
@@ -83,9 +107,10 @@ public class BiomeEditorScreen extends Screen {
         // ── Header bar: editable display name field ──────────────────────────
         // "Name:" label is drawn in renderHeader(); the field sits to its right.
         int nameFieldX = TAB_SIDEBAR_WIDTH + 50;
+        int nameFieldW = Math.min(width - nameFieldX - 220, 180);
         displayNameField = new TextFieldWidget(
                 textRenderer,
-                nameFieldX, 5, Math.min(width - nameFieldX - 80, 200), 16,
+                nameFieldX, 5, nameFieldW, 16,
                 Text.literal("Biome display name"));
         displayNameField.setMaxLength(64);
         displayNameField.setText(state.getDisplayName().isEmpty() ? "" : state.getDisplayName());
@@ -100,8 +125,38 @@ public class BiomeEditorScreen extends Screen {
         });
         addDrawableChild(displayNameField);
 
-        // TODO: Add Load button to header bar — triggers loadBiome() with a file picker
-        // TODO: Initialize tab sidebar buttons as proper ButtonWidget instances
+        // ── Header bar: Load button ──────────────────────────────────────────
+        // Clicking opens a dropdown of saved biome JSON files from strata_biomes/.
+        // Clicking the same button again (or pressing Escape) dismisses the picker.
+        int loadBtnX = nameFieldX + nameFieldW + 6;
+        addDrawableChild(ButtonWidget.builder(Text.literal("Load"), b -> {
+            if (loadPickerPaths != null) {
+                // Toggle off
+                loadPickerPaths = null;
+            } else {
+                loadPickerPaths = scanSavedBiomes();
+                loadPickerScroll = 0;
+            }
+        }).dimensions(loadBtnX, 5, 36, 16).build());
+
+        // ── Header bar: Reset World button ───────────────────────────────────
+        // Two-click confirm pattern: first click changes the label; second executes.
+        int resetBtnX = width - 100;
+        Text resetLabel = resetConfirmPending
+                ? Text.literal("Confirm?")
+                : Text.literal("Reset World");
+        addDrawableChild(ButtonWidget.builder(resetLabel, b -> {
+            if (resetConfirmPending) {
+                resetConfirmPending = false;
+                PreviewZoneManager pzm = BiomeEditorSession.getPreviewZoneManager();
+                if (pzm != null) {
+                    pzm.resetWorld();
+                }
+            } else {
+                resetConfirmPending = true;
+                b.setMessage(Text.literal("Confirm?"));
+            }
+        }).dimensions(resetBtnX, 5, 90, 16).build());
 
         initActiveTab();
     }
@@ -175,6 +230,11 @@ public class BiomeEditorScreen extends Screen {
 
         // === Child widgets (buttons, sliders, text fields) rendered LAST = on top ===
         super.render(context, mouseX, mouseY, delta);
+
+        // === Load picker dropdown — drawn above everything else ===
+        if (loadPickerPaths != null) {
+            renderLoadPicker(context, mouseX, mouseY);
+        }
     }
 
     private void renderHeader(DrawContext context, int mouseX, int mouseY) {
@@ -192,11 +252,11 @@ public class BiomeEditorScreen extends Screen {
                     TAB_SIDEBAR_WIDTH + 200, 26, 0xFF66AAFF, false);
         }
 
-        // Unsaved/unexported indicator on the right side of the header
+        // Unsaved/unexported indicator — placed to the left of the Reset World button
         if (!state.isExported() && state.isDirty()) {
-            context.drawText(textRenderer, "\u25CF Unsaved", width - 70, 10, 0xFFFFAA00, false);
+            context.drawText(textRenderer, "\u25CF Unsaved", width - 170, 10, 0xFFFFAA00, false);
         } else if (state.isExported()) {
-            context.drawText(textRenderer, "\u2713 Exported", width - 70, 10, 0xFF44FF44, false);
+            context.drawText(textRenderer, "\u2713 Exported", width - 170, 10, 0xFF44FF44, false);
         }
     }
 
@@ -242,7 +302,22 @@ public class BiomeEditorScreen extends Screen {
      */
     @Override
     public boolean mouseClicked(Click click, boolean doubleClick) {
-        // Hit-test the tab sidebar strip (below the header).
+        // ── Load picker dropdown ─────────────────────────────────────────────
+        if (loadPickerPaths != null) {
+            int pickerResult = hitTestLoadPicker((int) click.x(), (int) click.y());
+            if (pickerResult >= 0) {
+                // User selected a file
+                Path chosen = loadPickerPaths.get(loadPickerScroll + pickerResult);
+                loadPickerPaths = null;
+                loadBiome(chosen);
+                return true;
+            }
+            // Click outside the picker — dismiss it
+            loadPickerPaths = null;
+            // Don't consume — fall through so the click still registers normally
+        }
+
+        // ── Tab sidebar ──────────────────────────────────────────────────────
         if (click.button() == 0 && click.x() < TAB_SIDEBAR_WIDTH && click.y() >= HEADER_HEIGHT) {
             int relY     = (int) click.y() - HEADER_HEIGHT - 5;
             int tabIndex = relY / 22;
@@ -263,6 +338,12 @@ public class BiomeEditorScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (loadPickerPaths != null && !loadPickerPaths.isEmpty()) {
+            int delta = verticalAmount > 0 ? -1 : 1;
+            int maxScroll = Math.max(0, loadPickerPaths.size() - LOAD_PICKER_MAX_VISIBLE);
+            loadPickerScroll = Math.max(0, Math.min(loadPickerScroll + delta, maxScroll));
+            return true;
+        }
         if (activeTabIndex >= 0 && activeTabIndex < tabs.size()) {
             if (tabs.get(activeTabIndex).mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) {
                 return true;
@@ -289,6 +370,21 @@ public class BiomeEditorScreen extends Screen {
     @Override
     public boolean keyPressed(KeyInput keyInput) {
         var window = MinecraftClient.getInstance().getWindow();
+
+        // ── Escape: dismiss load picker or reset-confirm, then fall through ───
+        if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) {
+            if (loadPickerPaths != null) {
+                loadPickerPaths = null;
+                return true;
+            }
+            if (resetConfirmPending) {
+                resetConfirmPending = false;
+                // Re-init to restore the button label
+                clearChildren();
+                init();
+                return true;
+            }
+        }
 
         // ── Undo / Redo ────────────────────────────────────────────────────────
         boolean ctrlHeld = InputUtil.isKeyPressed(window, GLFW.GLFW_KEY_LEFT_CONTROL)
@@ -404,23 +500,144 @@ public class BiomeEditorScreen extends Screen {
     public BiomeEditorState.UndoManager getUndoManager() { return state.getUndoManager(); }
 
     /**
-     * Loads a biome from an existing JSON file into the editor state.
+     * Loads a saved biome JSON or draft JSON from {@code jsonPath} into the
+     * editor state, then triggers a Reset World so the new parameters take
+     * effect in the preview zone.
      *
-     * <p>If there are unsaved changes, a confirmation prompt should be shown
-     * before proceeding. Once confirmed, the JSON is parsed into a new
-     * {@link BiomeEditorState}, the editor state is replaced, and a Reset World
-     * regen is triggered to apply the new parameters in the preview zone.
+     * <p>The file is expected to be a {@link BiomeEditorState} JSON written by
+     * {@link BiomeEditorState#saveDraft} or by the Export tab. If the state
+     * cannot be parsed (e.g. it is a vanilla biome JSON) a warning is logged
+     * and the load is silently skipped.
      *
      * @param jsonPath the path to the biome JSON file to load
-     * @todo Implement: parse JSON → populate state → unsaved-change prompt → Reset World regen (SPEC §11 Phase 2)
      */
     public void loadBiome(Path jsonPath) {
-        // TODO: Implement load biome from list
-        // 1. If state.isDirty() || !state.isExported(), show confirmation prompt
-        // 2. Read and parse the biome JSON at jsonPath into a new BiomeEditorState
-        // 3. Replace the current state's fields with the loaded values
-        // 4. Trigger a Reset World regen to apply the new structural parameters
-        StrataLogger.debug("loadBiome() called for path {} — not yet implemented", jsonPath);
+        BiomeEditorState loaded = BiomeEditorState.loadDraft(jsonPath);
+        if (loaded == null) {
+            StrataLogger.warn("loadBiome: could not parse state from {}", jsonPath);
+            return;
+        }
+        state.restoreFrom(loaded);
+        clearChildren();
+        init();
+
+        // Trigger a Reset World so structural parameters (features/spawns) apply
+        PreviewZoneManager pzm = BiomeEditorSession.getPreviewZoneManager();
+        if (pzm != null) {
+            pzm.resetWorld();
+        }
+        StrataLogger.info("Loaded biome state from {}", jsonPath);
+    }
+
+    /**
+     * Scans {@code strata_biomes/} in the current world save for loadable JSON files.
+     *
+     * <p>Returns all {@code *.json} files in that directory, excluding the active
+     * session draft ({@code _session.draft.json}). The list is sorted alphabetically.
+     *
+     * @return a mutable list of paths; empty if the directory does not exist or
+     *         no files are found
+     */
+    private List<Path> scanSavedBiomes() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.getServer() == null) return new ArrayList<>();
+        Path biomesDir = mc.getServer().getSavePath(WorldSavePath.ROOT).resolve("strata_biomes");
+        if (!Files.isDirectory(biomesDir)) return new ArrayList<>();
+        try {
+            return Files.list(biomesDir)
+                    .filter(p -> p.getFileName().toString().endsWith(".json")
+                            && !p.getFileName().toString().equals("_session.draft.json"))
+                    .sorted()
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            StrataLogger.warn("scanSavedBiomes: could not list {}: {}", biomesDir, e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    // ── Load picker geometry constants (derived from button position set in init()) ──
+
+    /** X origin of the Load picker dropdown (aligns with the Load button). */
+    private int loadPickerX() {
+        // nameFieldX + nameFieldW + 6  (same origin as the Load button in init())
+        return TAB_SIDEBAR_WIDTH + 50 + Math.min(width - (TAB_SIDEBAR_WIDTH + 50) - 220, 180) + 6;
+    }
+
+    /** Width of the Load picker dropdown. */
+    private static final int LOAD_PICKER_WIDTH = 240;
+
+    /**
+     * Renders the Load-biome picker dropdown below the Load button.
+     */
+    private void renderLoadPicker(DrawContext context, int mouseX, int mouseY) {
+        int px = loadPickerX();
+        int py = HEADER_HEIGHT + 2; // just below the header bar
+
+        int visibleCount = Math.min(LOAD_PICKER_MAX_VISIBLE,
+                loadPickerPaths.isEmpty() ? 1 : loadPickerPaths.size() - loadPickerScroll);
+        int totalH = visibleCount * LOAD_PICKER_ROW_H + 4;
+
+        // Background + border
+        context.fill(px, py, px + LOAD_PICKER_WIDTH, py + totalH, 0xF0222244);
+        context.fill(px, py, px + LOAD_PICKER_WIDTH, py + 1, 0xFF4A90D9);
+        context.fill(px, py + totalH - 1, px + LOAD_PICKER_WIDTH, py + totalH, 0xFF4A90D9);
+        context.fill(px, py, px + 1, py + totalH, 0xFF4A90D9);
+        context.fill(px + LOAD_PICKER_WIDTH - 1, py, px + LOAD_PICKER_WIDTH, py + totalH, 0xFF4A90D9);
+
+        if (loadPickerPaths.isEmpty()) {
+            context.drawText(textRenderer, "No saved biomes found", px + 4, py + 4, 0xFF888888, false);
+            return;
+        }
+
+        int drawn = Math.min(visibleCount, loadPickerPaths.size() - loadPickerScroll);
+        for (int vi = 0; vi < drawn; vi++) {
+            int si = loadPickerScroll + vi;
+            int rowTop = py + 2 + vi * LOAD_PICKER_ROW_H;
+            boolean hovered = mouseX >= px && mouseX < px + LOAD_PICKER_WIDTH
+                    && mouseY >= rowTop && mouseY < rowTop + LOAD_PICKER_ROW_H;
+            if (hovered) {
+                context.fill(px + 1, rowTop, px + LOAD_PICKER_WIDTH - 1,
+                        rowTop + LOAD_PICKER_ROW_H, 0x50FFFFFF);
+            }
+            String name = loadPickerPaths.get(si).getFileName().toString();
+            // Strip .json extension for readability
+            if (name.endsWith(".json")) name = name.substring(0, name.length() - 5);
+            int textW = textRenderer.getWidth(name);
+            if (textW > LOAD_PICKER_WIDTH - 8) {
+                while (textRenderer.getWidth(name + "…") > LOAD_PICKER_WIDTH - 8
+                        && name.length() > 4) {
+                    name = name.substring(0, name.length() - 1);
+                }
+                name = name + "…";
+            }
+            context.drawText(textRenderer, name, px + 4, rowTop + 3, 0xFFCCCCCC, false);
+        }
+
+        // Scroll indicators
+        if (loadPickerScroll > 0) {
+            context.drawText(textRenderer, "▲", px + LOAD_PICKER_WIDTH - 12, py + 2, 0xFF4A90D9, false);
+        }
+        if (loadPickerScroll + visibleCount < loadPickerPaths.size()) {
+            context.drawText(textRenderer, "▼", px + LOAD_PICKER_WIDTH - 12,
+                    py + totalH - LOAD_PICKER_ROW_H, 0xFF4A90D9, false);
+        }
+    }
+
+    /**
+     * Returns the 0-based row index under ({@code mx}, {@code my}) within the
+     * load picker, or {@code -1} if the coordinates are outside the picker.
+     */
+    private int hitTestLoadPicker(int mx, int my) {
+        if (loadPickerPaths == null || loadPickerPaths.isEmpty()) return -1;
+        int px = loadPickerX();
+        int py = HEADER_HEIGHT + 2;
+        int visibleCount = Math.min(LOAD_PICKER_MAX_VISIBLE, loadPickerPaths.size() - loadPickerScroll);
+        int totalH = visibleCount * LOAD_PICKER_ROW_H + 4;
+        if (mx < px || mx >= px + LOAD_PICKER_WIDTH || my < py || my >= py + totalH) return -1;
+        int relY = my - py - 2;
+        if (relY < 0) return -1;
+        int row = relY / LOAD_PICKER_ROW_H;
+        return (row < visibleCount) ? row : -1;
     }
 
     /**
