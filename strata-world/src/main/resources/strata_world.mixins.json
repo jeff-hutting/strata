@@ -5,6 +5,7 @@
   "mixins": [
     "BiomeGenerationMixin",
     "ChunkGeneratorAccessor",
+    "ChunkGeneratorMutableMixin",
     "GenerationSettingsAccessor",
     "MultiNoiseBiomeSourceMixin",
     "VanillaBiomeParametersMixin"
