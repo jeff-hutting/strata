@@ -219,6 +219,20 @@ public class PreviewZoneManager {
         MinecraftServer server = mc.getServer();
         if (server == null) return;
 
+        // Save the draft to disk NOW, before the server stops.
+        //
+        // SERVER_STARTED (on the next world open) loads the draft file to rebuild
+        // dynamic features/spawns. The DISCONNECT handler also tries to save, but
+        // client.getServer() may be null by the time it fires, in which case
+        // getDraftPath() returns null and the save is silently skipped. Saving here
+        // — while we still hold a direct server reference — guarantees the draft
+        // is always current when the new server session reads it.
+        Path draftPath = server.getSavePath(WorldSavePath.ROOT)
+                .resolve("strata_biomes").resolve("_session.draft.json");
+        state.saveDraft(draftPath);
+        StrataLogger.info("Reset World: saved draft ({} feature(s), {} spawn(s)) to {}",
+                state.getFeatures().size(), state.getSpawnEntries().size(), draftPath);
+
         // Schedule region-file deletion before the server stops.
         // getSavePath() only reads a stored Path — safe from the render thread.
         Path regionDir = server.getSavePath(WorldSavePath.ROOT).resolve("region");
